@@ -1,57 +1,37 @@
 #include "sim.h"
+#include "platform.c"
 
-static buffer *AllocateBuffer(Size)
+/*
+  NOTE: for now we will emit assembly instructions from the instruction buffer, to test if we
+  properly interpreted the byte-stream
+*/
+static s32 SimulateInstructionBuffer(buffer *InstructionBuffer)
 {
-    buffer *Buffer = malloc(BUFFER_ALLOC_SIZE(Size));
-    Buffer->Size = Size;
-    Buffer->Data = (u8 *)(Buffer + sizeof(buffer));
-    return Buffer;
-}
-
-static void FreeBuffer(buffer *Buffer)
-{
-    free(Buffer);
-}
-
-static buffer *ReadFileIntoBuffer(char *FilePath)
-{
-    s32 FileSize;
-    buffer *Buffer;
-    FILE *File = fopen(FilePath, "rb");
-    if(!File)
-    {
-        printf("File not found\n");
-        return 0;
-    }
-    fseek(File, 0, SEEK_END);
-    FileSize = ftell(File);
-    fseek(File, 0, SEEK_SET);
-    Buffer = AllocateBuffer(FileSize);
-    fread(Buffer->Data, FileSize, 1, File);
-    fclose(File);
-    return Buffer;
-}
-
-static s32 TestSim()
-{
-    s32 I, Result = 0;
-    buffer *Buffer = ReadFileIntoBuffer("../assets/test.txt");
-    if(!Buffer)
-    {
-        return 1;
-    }
+    s32 I, Success = 1;
     printf("buffer\n");
-    for(I = 0; I < Buffer->Size; ++I)
+    for(I = 0; I < InstructionBuffer->Size; ++I)
     {
-        printf("0x%x ", Buffer->Data[I]);
-        if(Buffer->Data[I] == '\n')
+        printf("0x%x ", InstructionBuffer->Data[I]);
+        if(InstructionBuffer->Data[I] == '\n')
         {
             printf("\n");
         }
     }
     printf("\nHello world\n");
+    return Success;
+}
+
+static s32 TestSim()
+{
+    s32 SimResult = 0;
+    buffer *Buffer = ReadFileIntoBuffer("../assets/test.txt");
+    if(!Buffer)
+    {
+        return 1;
+    }
+    SimResult = SimulateInstructionBuffer(Buffer);
     FreeBuffer(Buffer);
-    return Result;
+    return SimResult;
 }
 
 s32 main()
