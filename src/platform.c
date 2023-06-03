@@ -1,6 +1,6 @@
 #include "platform.h"
 
-static buffer *AllocateBuffer(Size)
+static buffer *AllocateBuffer(s32 Size)
 {
     buffer *Buffer = malloc(BUFFER_ALLOC_SIZE(Size));
     Buffer->Size = Size;
