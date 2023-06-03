@@ -10,26 +10,31 @@ typedef size_t size;
 
 typedef enum
 {
-   instruction_kind_None,
-   instruction_kind_RegisterMemoryToFromRegister,
-   instruction_kind_ImmediateToRegisterMemory,
-   instruction_kind_ImmediateToRegister,
-   instruction_kind_MemoryAccumulator,
-   instruction_kind_SegmentRegister,
-   instruction_kind_RegisterToRegisterMemory,
-   /* TODO: fill out the rest of the instructions */
-} instruction_kind;
+   opcode_kind_None,
+   opcode_kind_RegisterMemoryToFromRegister,
+   opcode_kind_ImmediateToRegisterMemory,
+   opcode_kind_ImmediateToRegister,
+   opcode_kind_MemoryAccumulator,
+   opcode_kind_SegmentRegister,
+   opcode_kind_RegisterToRegisterMemory
+} opcode_kind;
 
-static char *DisplayInstructionKind(instruction_kind Kind)
+typedef struct
+{
+    opcode_kind Kind;
+    s32 Length;
+} opcode;
+
+static char *DisplayOpcodeKind(opcode_kind Kind)
 {
     switch(Kind)
     {
-    case instruction_kind_None: return "instruction_kind_None";
-    case instruction_kind_RegisterMemoryToFromRegister: return "instruction_kind_RegisterMemoryToFromRegister";
-    case instruction_kind_ImmediateToRegisterMemory: return "instruction_kind_ImmediateToRegisterMemory";
-    case instruction_kind_ImmediateToRegister: return "instruction_kind_ImmediateToRegister";
-    case instruction_kind_MemoryAccumulator: return "instruction_kind_MemoryAccumulator";
-    case instruction_kind_SegmentRegister: return "instruction_kind_SegmentRegister";
-    case instruction_kind_RegisterToRegisterMemory: return "instruction_kind_RegisterToRegisterMemory";
+    case opcode_kind_RegisterMemoryToFromRegister: return "opcode_kind_RegisterMemoryToFromRegister";
+    case opcode_kind_ImmediateToRegisterMemory: return "opcode_kind_ImmediateToRegisterMemory";
+    case opcode_kind_ImmediateToRegister: return "opcode_kind_ImmediateToRegister";
+    case opcode_kind_MemoryAccumulator: return "opcode_kind_MemoryAccumulator";
+    case opcode_kind_SegmentRegister: return "opcode_kind_SegmentRegister";
+    case opcode_kind_RegisterToRegisterMemory: return "opcode_kind_RegisterToRegisterMemory";
+    case opcode_kind_None: default: return "opcode_kind_None";
     }
 }
