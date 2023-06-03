@@ -5,7 +5,6 @@
 #define GET_OPCODE(b) (((b) >> 2) & OPCODE_MASK)
 
 #define OPCODE_TAIL_MASK 0b11
-/* TODO: should GET_OPCODE_TAIL shift down? isn't the tail at the end, and so we just mask without any shifts? */
 #define GET_OPCODE_TAIL(b) ((b) & OPCODE_MASK)
 
 #define OPCODE_BIT_WIDTH 6
@@ -21,19 +20,9 @@ s32 OpcodeTable[OPCODE_TABLE_COUNT] = {
     [0b100011] = instruction_kind_SegmentRegister,
 };
 
-static s32 InstructionSize(u8 Byte)
+static s32 GetInstructionSize(buffer *InstructionBuffer, s32 Index)
 {
-    s32 Opcode = GET_OPCODE(Byte);
-    s32 OpcodeTail = GET_OPCODE_TAIL(Byte);
-
-}
-
-static void DecodeInstructionBuffer(buffer *InstructionBuffer)
-{
-    s32 I = 0;
-    while(I < InstructionBuffer->Size)
-    {
-    }
+    return 2;
 }
 
 /*
@@ -43,23 +32,38 @@ static void DecodeInstructionBuffer(buffer *InstructionBuffer)
 static s32 SimulateInstructionBuffer(buffer *InstructionBuffer)
 {
     s32 I, Success = 1;
-    printf("buffer\n");
     for(I = 0; I < InstructionBuffer->Size; ++I)
     {
-        printf("0x%x ", InstructionBuffer->Data[I]);
-        if(InstructionBuffer->Data[I] == '\n')
+        u8 Opcode = GET_OPCODE(InstructionBuffer->Data[I]);
+        instruction_kind InstructionKind = OpcodeTable[Opcode];
+        s32 InstructionSize = GetInstructionSize(InstructionBuffer, I);
+        switch(InstructionKind)
         {
-            printf("\n");
+        case instruction_kind_RegisterMemoryToFromRegister:
+        {
+            printf("mov XXX, XXX\n");
+            /* printf("0x%x %s\n", InstructionBuffer->Data[I], DisplayInstructionKind(OpcodeTable[Opcode])); */
+        } break;
+        case instruction_kind_ImmediateToRegisterMemory:
+        case instruction_kind_ImmediateToRegister:
+        case instruction_kind_MemoryAccumulator:
+        case instruction_kind_SegmentRegister:
+        case instruction_kind_RegisterToRegisterMemory:
+        default:
+        {
+            printf("Error\n");
+            return -1;
+        }
         }
     }
-    printf("\nHello world\n");
+    printf("\n");
     return Success;
 }
 
 static s32 TestSim()
 {
     s32 SimResult = 0;
-    buffer *Buffer = ReadFileIntoBuffer("../assets/test.txt");
+    buffer *Buffer = ReadFileIntoBuffer("../assets/test1");
     if(!Buffer)
     {
         return 1;
