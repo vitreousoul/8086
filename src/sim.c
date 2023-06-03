@@ -63,7 +63,7 @@ static s32 SimulateInstructionBuffer(buffer *InstructionBuffer)
 static s32 TestSim()
 {
     s32 SimResult = 0;
-    buffer *Buffer = ReadFileIntoBuffer("../assets/test1");
+    buffer *Buffer = ReadFileIntoBuffer("../assets/test");
     if(!Buffer)
     {
         return 1;
