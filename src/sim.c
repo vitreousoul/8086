@@ -10,6 +10,7 @@
   DOCS: The first six bits of a multibyte instruction generally contain an opcode
   that identifies the basic instruction type: ADD, XOR, etc.
 */
+#define OPCODE_BITS 6
 #define OPCODE_MASK 0b111111
 #define GET_OPCODE(b) (OPCODE_MASK & ((b) >> 2))
 /*
@@ -17,22 +18,26 @@
   1 = the REG field in the second byte identifies the destination operand,
   0 = the REG field identifies the source operand
 */
+#define D_BITS 1
 #define D_MASK 0b1
 #define GET_D(b) (D_MASK & ((b) >> 1))
 /*
   DOCS: The W field distinguishes between byte and word operations: 0 = byte, 1 = word.
 */
+#define W_BITS 1
 #define W_MASK 0b1
 #define GET_W(b) (W_MASK & (b))
 /*
   DOCS: The second byte of the instruction usually identifies the instruction's operands.
   The MOD (mode) field indicates whether one of the operands is in memory or whether both operands are registers.
 */
+#define MOD_BITS 2
 #define MOD_MASK 0b11
 #define GET_MOD(b) (MOD_MASK & ((b) >> 6))
 /*
   DOCS: The REG (register) field identifies a register that is one of the instruction operands.
 */
+#define REG_BITS 3
 #define REG_MASK 0b111
 #define GET_REG(b) (REG_MASK & ((b) >> 3))
 /*
@@ -40,21 +45,42 @@
   If MOD = 11 (register-to-register mode), then R/M identifies the second register operand.
   If MOD selects memory mode, then R/M indicates how the effective address of the memory operand is to be calculated.
 */
+#define RM_BITS 3
 #define RM_MASK 0b111
 #define GET_RM(b) (RM_MASK & (b))
 
+#define OPCODE_COUNT (1 << OPCODE_BITS)
+#define MOD_COUNT (1 << MOD_BITS)
+#define REG_COUNT (1 << REG_BITS)
+#define W_COUNT (1 << REG_BITS)
 
-#define OPCODE_BIT_WIDTH 6
-#define OPCODE_TABLE_COUNT (1 << OPCODE_BIT_WIDTH)
-opcode OpcodeTable[OPCODE_TABLE_COUNT] = {
-    [0b100010] = {opcode_kind_RegisterMemoryToFromRegister,2},
-    [0b110001] = {opcode_kind_ImmediateToRegisterMemory,2},
-    [0b101100] = {opcode_kind_ImmediateToRegister,2},
-    [0b101101] = {opcode_kind_ImmediateToRegister,2},
-    [0b101110] = {opcode_kind_ImmediateToRegister,2},
-    [0b101111] = {opcode_kind_ImmediateToRegister,2},
-    [0b101000] = {opcode_kind_MemoryAccumulator,2},
-    [0b100011] = {opcode_kind_SegmentRegister,2},
+opcode OpcodeTable[OPCODE_COUNT] = {
+    [0b100010] = {opcode_kind_RegisterMemoryToFromRegister,  2},
+    [0b110001] = {opcode_kind_ImmediateToRegisterMemory,     2},
+    [0b101100] = {opcode_kind_ImmediateToRegister,           2},
+    [0b101101] = {opcode_kind_ImmediateToRegister,           2},
+    [0b101110] = {opcode_kind_ImmediateToRegister,           2},
+    [0b101111] = {opcode_kind_ImmediateToRegister,           2},
+    [0b101000] = {opcode_kind_MemoryAccumulator,             2},
+    [0b100011] = {opcode_kind_SegmentRegister,               2},
+};
+
+s32 ModTable[MOD_COUNT] = {
+  [0b00] = -1, /* DOCS: Memory Mode, no displacement follows except when R/M = 110, then 16-bit displacement follows */
+  [0b01] = -1, /* DOCS: Memory Mode, 8-bit displacement follows */
+  [0b10] = -1, /* DOCS: Memory Mode, 16-bit displacement follows */
+  [0b11] = -1, /* DOCS: Register Mode (no displacement) */
+};
+
+s32 RegTable[REG_COUNT][W_COUNT] = {
+    [0b000] = {AL,AX},
+    [0b001] = {CL,CX},
+    [0b010] = {DL,DX},
+    [0b011] = {BL,BX},
+    [0b100] = {AH,SP},
+    [0b101] = {CH,BP},
+    [0b110] = {DH,SI},
+    [0b111] = {BH,DI},
 };
 
 static s32 SimulateBuffer(buffer *OpcodeBuffer)
@@ -71,7 +97,11 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer)
             */
             break;
         }
-        u8 OpcodeValue = GET_OPCODE(OpcodeBuffer->Data[OpcodeBuffer->Index]);
+        u8 FirstByte = OpcodeBuffer->Data[OpcodeBuffer->Index];
+        u8 SecondByte = OpcodeBuffer->Data[OpcodeBuffer->Index + 1];
+        u8 OpcodeValue = GET_OPCODE(FirstByte);
+        s32 W = GET_W(FirstByte);
+        s32 REG = GET_REG(SecondByte);
         opcode Opcode = OpcodeTable[OpcodeValue];
         printf("opcode kind %s\n", DisplayOpcodeKind(Opcode.Kind));
         switch(Opcode.Kind)
@@ -79,7 +109,7 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer)
         case opcode_kind_RegisterMemoryToFromRegister:
         {
             printf("mov XXX, XXX\n");
-            /* printf("0x%x %s\n", Buffer->Data[OpcodeBuffer->Index], DisplayOpcodeKind(OpcodeTable[Opcode])); */
+            printf("0x%x 0x%x %s\n", FirstByte, SecondByte, DisplayOpcodeKind(Opcode.Kind));
         } break;
         case opcode_kind_ImmediateToRegisterMemory:
         case opcode_kind_ImmediateToRegister:

@@ -25,6 +25,16 @@ typedef struct
     s32 Length;
 } opcode;
 
+typedef enum
+{
+    UNKNOWN_REGISTER,
+    AH, AL, AX,
+    BH, BL, BP, BX,
+    CH, CL, CX,
+    DH, DI, DL, DX,
+    SI, SP,
+} register_name;
+
 static char *DisplayOpcodeKind(opcode_kind Kind)
 {
     switch(Kind)
@@ -36,5 +46,30 @@ static char *DisplayOpcodeKind(opcode_kind Kind)
     case opcode_kind_SegmentRegister: return "opcode_kind_SegmentRegister";
     case opcode_kind_RegisterToRegisterMemory: return "opcode_kind_RegisterToRegisterMemory";
     case opcode_kind_None: default: return "opcode_kind_None";
+    }
+}
+
+static char *DisplayRegisterName(register_name Name)
+{
+    switch(Name)
+    {
+    case AH: return "AH";
+    case AL: return "AL";
+    case AX: return "AX";
+    case BH: return "BH";
+    case BL: return "BL";
+    case BP: return "BP";
+    case BX: return "BX";
+    case CH: return "CH";
+    case CL: return "CL";
+    case CX: return "CX";
+    case DH: return "DH";
+    case DI: return "DI";
+    case DL: return "DL";
+    case DX: return "DX";
+    case SI: return "SI";
+    case SP: return "SP";
+    default:
+    case UNKNOWN_REGISTER: return "UNKNOWN_REGISTER";
     }
 }
