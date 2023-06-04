@@ -13,6 +13,7 @@
 #define OPCODE_BITS 6
 #define OPCODE_MASK 0b111111
 #define GET_OPCODE(b) (OPCODE_MASK & ((b) >> 2))
+
 /*
   DOCS: The following bit, called the D field, generally specifies the "direction" of the operation:
   1 = the REG field in the second byte identifies the destination operand,
@@ -21,12 +22,14 @@
 #define D_BITS 1
 #define D_MASK 0b1
 #define GET_D(b) (D_MASK & ((b) >> 1))
+
 /*
   DOCS: The W field distinguishes between byte and word operations: 0 = byte, 1 = word.
 */
 #define W_BITS 1
 #define W_MASK 0b1
 #define GET_W(b) (W_MASK & (b))
+
 /*
   DOCS: The second byte of the instruction usually identifies the instruction's operands.
   The MOD (mode) field indicates whether one of the operands is in memory or whether both operands are registers.
@@ -34,12 +37,14 @@
 #define MOD_BITS 2
 #define MOD_MASK 0b11
 #define GET_MOD(b) (MOD_MASK & ((b) >> 6))
+
 /*
   DOCS: The REG (register) field identifies a register that is one of the instruction operands.
 */
 #define REG_BITS 3
 #define REG_MASK 0b111
 #define GET_REG(b) (REG_MASK & ((b) >> 3))
+
 /*
   DOCS: The encoding of the R/M (register/memory) field depends on how the mode field is set.
   If MOD = 11 (register-to-register mode), then R/M identifies the second register operand.
@@ -91,10 +96,7 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer)
         if(OpcodeBuffer->Index >= OpcodeBuffer->Size - 1)
         {
             /* check (Size - 1) because we assume the opcode is at least two bytes long */
-            /*
-              TODO: there should be an error here sometimes.
-              Like if there is a lone byte at the end of the instruction stream
-            */
+            /* TODO: there should be an error here sometimes. Like if there is a lone byte at the end of the instruction stream */
             break;
         }
         u8 FirstByte = OpcodeBuffer->Data[OpcodeBuffer->Index];
