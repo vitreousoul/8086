@@ -3,5 +3,6 @@
 typedef struct
 {
     s32 Size;
+    s32 Index;
     u8 *Data;
 } buffer;
