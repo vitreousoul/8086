@@ -35,6 +35,35 @@ typedef enum
     SI, SP,
 } register_name;
 
+typedef enum
+{
+    eac_NONE,
+    eac_BX_SI,
+    eac_BX_DI,
+    eac_BP_SI,
+    eac_BP_DI,
+    eac_SI,
+    eac_DI,
+    eac_DIRECT_ADDRESS,
+    eac_BX,
+    eac_BX_SI_D8,
+    eac_BX_DI_D8,
+    eac_BP_SI_D8,
+    eac_BP_DI_D8,
+    eac_SI_D8,
+    eac_DI_D8,
+    eac_BP_D8,
+    eac_BX_D8,
+    eac_BX_SI_D16,
+    eac_BX_DI_D16,
+    eac_BP_SI_D16,
+    eac_BP_DI_D16,
+    eac_SI_D16,
+    eac_DI_D16,
+    eac_BP_D16,
+    eac_BX_D16,
+} effective_address_calculation;
+
 static char *DisplayOpcodeKind(opcode_kind Kind)
 {
     switch(Kind)

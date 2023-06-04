@@ -58,6 +58,7 @@
 #define MOD_COUNT (1 << MOD_BITS)
 #define REG_COUNT (1 << REG_BITS)
 #define W_COUNT (1 << REG_BITS)
+#define RM_COUNT (1 << RM_BITS)
 
 opcode OpcodeTable[OPCODE_COUNT] = {
     [0b100010] = {opcode_kind_RegisterMemoryToFromRegister,  2},
@@ -71,10 +72,10 @@ opcode OpcodeTable[OPCODE_COUNT] = {
 };
 
 s32 ModTable[MOD_COUNT] = {
-  [0b00] = -1, /* DOCS: Memory Mode, no displacement follows except when R/M = 110, then 16-bit displacement follows */
-  [0b01] = -1, /* DOCS: Memory Mode, 8-bit displacement follows */
-  [0b10] = -1, /* DOCS: Memory Mode, 16-bit displacement follows */
-  [0b11] = -1, /* DOCS: Register Mode (no displacement) */
+    [0b00] = -1, /* DOCS: Memory Mode, no displacement follows except when R/M = 110, then 16-bit displacement follows */
+    [0b01] = -1, /* DOCS: Memory Mode, 8-bit displacement follows */
+    [0b10] = -1, /* DOCS: Memory Mode, 16-bit displacement follows */
+    [0b11] = -1, /* DOCS: Register Mode (no displacement) */
 };
 
 s32 RegTable[REG_COUNT][W_COUNT] = {
@@ -88,9 +89,43 @@ s32 RegTable[REG_COUNT][W_COUNT] = {
     [0b111] = {BH,DI},
 };
 
+s32 EffectiveAddressCalculationTable[MOD_COUNT][RM_COUNT] = {
+    [0b00] = {
+        eac_BX_SI,
+        eac_BX_DI,
+        eac_BP_SI,
+        eac_BP_DI,
+        eac_SI,
+        eac_DI,
+        eac_DIRECT_ADDRESS,
+        eac_BX,
+    },
+    [0b01] = {
+        eac_BX_SI_D8,
+        eac_BX_DI_D8,
+        eac_BP_SI_D8,
+        eac_BP_DI_D8,
+        eac_SI_D8,
+        eac_DI_D8,
+        eac_BP_D8,
+        eac_BX_D8,
+    },
+    [0b10] = {
+        eac_BX_SI_D16,
+        eac_BX_DI_D16,
+        eac_BP_SI_D16,
+        eac_BP_DI_D16,
+        eac_SI_D16,
+        eac_DI_D16,
+        eac_BP_D16,
+        eac_BX_D16,
+    },
+};
+
 static s32 SimulateBuffer(buffer *OpcodeBuffer)
 {
     s32 Result = 0;
+    printf("bits 16\n");
     while(1)
     {
         if(OpcodeBuffer->Index >= OpcodeBuffer->Size - 1)
@@ -102,16 +137,29 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer)
         u8 FirstByte = OpcodeBuffer->Data[OpcodeBuffer->Index];
         u8 SecondByte = OpcodeBuffer->Data[OpcodeBuffer->Index + 1];
         u8 OpcodeValue = GET_OPCODE(FirstByte);
+        s32 D = GET_D(FirstByte);
         s32 W = GET_W(FirstByte);
+        s32 MOD = GET_MOD(SecondByte);
         s32 REG = GET_REG(SecondByte);
+        s32 RM = GET_RM(SecondByte);
         opcode Opcode = OpcodeTable[OpcodeValue];
-        printf("opcode kind %s\n", DisplayOpcodeKind(Opcode.Kind));
         switch(Opcode.Kind)
         {
         case opcode_kind_RegisterMemoryToFromRegister:
         {
-            printf("mov XXX, XXX\n");
-            printf("0x%x 0x%x %s\n", FirstByte, SecondByte, DisplayOpcodeKind(Opcode.Kind));
+            if(MOD == 0b11)
+            {
+                s32 DestinationIndex = D ? REG : RM;
+                s32 SourceIndex      = D ? RM  : REG;
+                s32 DestinationRegister = RegTable[DestinationIndex][W];
+                s32 SourceRegister      = RegTable[SourceIndex     ][W];
+                printf("mov %s, %s\n", DisplayRegisterName(DestinationRegister), DisplayRegisterName(SourceRegister));
+            }
+            else
+            {
+                printf("Unimplemented!\n");
+                return -1;
+            }
         } break;
         case opcode_kind_ImmediateToRegisterMemory:
         case opcode_kind_ImmediateToRegister:
@@ -133,7 +181,7 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer)
 static s32 TestSim(void)
 {
     s32 SimResult = 0;
-    buffer *Buffer = ReadFileIntoBuffer("../assets/test");
+    buffer *Buffer = ReadFileIntoBuffer("../assets/test_many_register");
     if(!Buffer)
     {
         return 1;
