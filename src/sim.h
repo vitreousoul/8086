@@ -22,7 +22,6 @@ typedef enum
 typedef struct
 {
     opcode_kind Kind;
-    s32 Length;
 } opcode;
 
 typedef enum

@@ -29,6 +29,7 @@
 #define W_BITS 1
 #define W_MASK 0b1
 #define GET_W(b) (W_MASK & (b))
+#define GET_IMMEDIATE_TO_REGISTER_W(b) (W_MASK & ((b) >> 3))
 
 /*
   DOCS: The second byte of the instruction usually identifies the instruction's operands.
@@ -44,6 +45,7 @@
 #define REG_BITS 3
 #define REG_MASK 0b111
 #define GET_REG(b) (REG_MASK & ((b) >> 3))
+#define GET_IMMEDIATE_TO_REGISTER_REG(b) (REG_MASK & (b))
 
 /*
   DOCS: The encoding of the R/M (register/memory) field depends on how the mode field is set.
@@ -61,14 +63,14 @@
 #define RM_COUNT (1 << RM_BITS)
 
 opcode OpcodeTable[OPCODE_COUNT] = {
-    [0b100010] = {opcode_kind_RegisterMemoryToFromRegister,  2},
-    [0b110001] = {opcode_kind_ImmediateToRegisterMemory,     2},
-    [0b101100] = {opcode_kind_ImmediateToRegister,           2},
-    [0b101101] = {opcode_kind_ImmediateToRegister,           2},
-    [0b101110] = {opcode_kind_ImmediateToRegister,           2},
-    [0b101111] = {opcode_kind_ImmediateToRegister,           2},
-    [0b101000] = {opcode_kind_MemoryAccumulator,             2},
-    [0b100011] = {opcode_kind_SegmentRegister,               2},
+    [0b100010] = {opcode_kind_RegisterMemoryToFromRegister},
+    [0b110001] = {opcode_kind_ImmediateToRegisterMemory},
+    [0b101100] = {opcode_kind_ImmediateToRegister},
+    [0b101101] = {opcode_kind_ImmediateToRegister},
+    [0b101110] = {opcode_kind_ImmediateToRegister},
+    [0b101111] = {opcode_kind_ImmediateToRegister},
+    [0b101000] = {opcode_kind_MemoryAccumulator},
+    [0b100011] = {opcode_kind_SegmentRegister},
 };
 
 s32 ModTable[MOD_COUNT] = {
@@ -122,31 +124,39 @@ s32 EffectiveAddressCalculationTable[MOD_COUNT][RM_COUNT] = {
     },
 };
 
+static s32 GetInstructionLength(buffer *OpcodeBuffer)
+{
+    return 2;
+}
+
 static s32 SimulateBuffer(buffer *OpcodeBuffer)
 {
+    /* TODO: define simulated values as s16 since it should run in 16-bit mode eventually */
     s32 Result = 0;
     printf("bits 16\n");
     while(1)
     {
-        if(OpcodeBuffer->Index >= OpcodeBuffer->Size - 1)
+        if(OpcodeBuffer->Index >= OpcodeBuffer->Size)
         {
             /* check (Size - 1) because we assume the opcode is at least two bytes long */
             /* TODO: there should be an error here sometimes. Like if there is a lone byte at the end of the instruction stream */
             break;
         }
         u8 FirstByte = OpcodeBuffer->Data[OpcodeBuffer->Index];
-        u8 SecondByte = OpcodeBuffer->Data[OpcodeBuffer->Index + 1];
         u8 OpcodeValue = GET_OPCODE(FirstByte);
+        opcode Opcode = OpcodeTable[OpcodeValue];
         s32 D = GET_D(FirstByte);
         s32 W = GET_W(FirstByte);
-        s32 MOD = GET_MOD(SecondByte);
-        s32 REG = GET_REG(SecondByte);
-        s32 RM = GET_RM(SecondByte);
-        opcode Opcode = OpcodeTable[OpcodeValue];
+        /* printf("%x %x\n", FirstByte, SecondByte); */
+        s32 InstructionLength = GetInstructionLength(OpcodeBuffer);
         switch(Opcode.Kind)
         {
         case opcode_kind_RegisterMemoryToFromRegister:
         {
+            u8 SecondByte = OpcodeBuffer->Data[OpcodeBuffer->Index + 1];
+            s32 MOD = GET_MOD(SecondByte);
+            s32 REG = GET_REG(SecondByte);
+            s32 RM = GET_RM(SecondByte);
             if(MOD == 0b11)
             {
                 s32 DestinationIndex = D ? REG : RM;
@@ -162,17 +172,45 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer)
             }
         } break;
         case opcode_kind_ImmediateToRegisterMemory:
+            printf("opcode_kind_ImmediateToRegisterMemory\n");
+            return -1;
         case opcode_kind_ImmediateToRegister:
+        {
+            u8 SecondByte = OpcodeBuffer->Data[OpcodeBuffer->Index + 1];
+            /* u8 SignBit = (0b1 & (SecondByte >> 7)); */
+            s32 REG = GET_IMMEDIATE_TO_REGISTER_REG(FirstByte);
+            s32 W = GET_IMMEDIATE_TO_REGISTER_W((s32)FirstByte);
+            s32 DestinationRegister = RegTable[REG][W];
+            s32 Immediate = (SecondByte << 24) >> 24; /* this feels dirty.... but it's a way to retain sign-extension */
+            if (W)
+            {
+                if (OpcodeBuffer->Index + 2 >= OpcodeBuffer->Size)
+                {
+                    printf("opcode_kind_ImmediateToRegister unexpected end of buffer\n");
+                    return -1;
+                }
+                u8 ThirdByte = OpcodeBuffer->Data[OpcodeBuffer->Index + 2];
+                /* TODO: handle wide W=1 immediate, which needs to look at a third byte */
+                Immediate = (ThirdByte << 8) | SecondByte;
+            }
+            printf("mov %s, %d\n", DisplayRegisterName(DestinationRegister), Immediate);
+        } break;
         case opcode_kind_MemoryAccumulator:
+            printf("opcode_kind_MemoryAccumulator\n");
+            return -1;
         case opcode_kind_SegmentRegister:
+            printf("opcode_kind_SegmentRegister\n");
+            return -1;
         case opcode_kind_RegisterToRegisterMemory:
+            printf("opcode_kind_RegisterToRegisterMemory\n");
+            return -1;
         default:
         {
             printf("Error\n");
             return -1;
         }
         }
-        OpcodeBuffer->Index += Opcode.Length;
+        OpcodeBuffer->Index += InstructionLength;
     }
     printf("\n");
     return Result;
@@ -181,7 +219,7 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer)
 static s32 TestSim(void)
 {
     s32 SimResult = 0;
-    buffer *Buffer = ReadFileIntoBuffer("../assets/test_many_register");
+    buffer *Buffer = ReadFileIntoBuffer("../assets/listing_0039_more_movs");
     if(!Buffer)
     {
         return 1;
