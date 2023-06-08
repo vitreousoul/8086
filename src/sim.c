@@ -145,8 +145,8 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer)
         u8 FirstByte = OpcodeBuffer->Data[OpcodeBuffer->Index];
         u8 OpcodeValue = GET_OPCODE(FirstByte);
         opcode Opcode = OpcodeTable[OpcodeValue];
-        s32 D = GET_D(FirstByte);
-        s32 W = GET_W(FirstByte);
+        s16 D = GET_D(FirstByte);
+        s16 W = GET_W(FirstByte);
         /* printf("%x %x\n", FirstByte, SecondByte); */
         s32 InstructionLength = GetInstructionLength(OpcodeBuffer);
         switch(Opcode.Kind)
@@ -154,20 +154,20 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer)
         case opcode_kind_RegisterMemoryToFromRegister:
         {
             u8 SecondByte = OpcodeBuffer->Data[OpcodeBuffer->Index + 1];
-            s32 MOD = GET_MOD(SecondByte);
-            s32 REG = GET_REG(SecondByte);
-            s32 RM = GET_RM(SecondByte);
+            s16 MOD = GET_MOD(SecondByte);
+            s16 REG = GET_REG(SecondByte);
+            s16 RM = GET_RM(SecondByte);
             if(MOD == 0b11)
             {
-                s32 DestinationIndex = D ? REG : RM;
-                s32 SourceIndex      = D ? RM  : REG;
-                s32 DestinationRegister = RegTable[DestinationIndex][W];
-                s32 SourceRegister      = RegTable[SourceIndex     ][W];
+                s16 DestinationIndex = D ? REG : RM;
+                s16 SourceIndex      = D ? RM  : REG;
+                s16 DestinationRegister = RegTable[DestinationIndex][W];
+                s16 SourceRegister      = RegTable[SourceIndex     ][W];
                 printf("mov %s, %s\n", DisplayRegisterName(DestinationRegister), DisplayRegisterName(SourceRegister));
             }
             else
             {
-                printf("Unimplemented!\n");
+                printf("opcode_kind_RegisterMemoryToFromRegister: Unimplemented!\n");
                 return -1;
             }
         } break;
@@ -178,10 +178,10 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer)
         {
             u8 SecondByte = OpcodeBuffer->Data[OpcodeBuffer->Index + 1];
             /* u8 SignBit = (0b1 & (SecondByte >> 7)); */
-            s32 REG = GET_IMMEDIATE_TO_REGISTER_REG(FirstByte);
-            s32 W = GET_IMMEDIATE_TO_REGISTER_W((s32)FirstByte);
-            s32 DestinationRegister = RegTable[REG][W];
-            s32 Immediate = (SecondByte << 24) >> 24; /* this feels dirty.... but it's a way to retain sign-extension */
+            s16 REG = GET_IMMEDIATE_TO_REGISTER_REG(FirstByte);
+            s16 W = GET_IMMEDIATE_TO_REGISTER_W((s32)FirstByte);
+            s16 DestinationRegister = RegTable[REG][W];
+            s16 Immediate = (SecondByte << 24) >> 24; /* this feels dirty.... but it's a way to retain sign-extension */
             if (W)
             {
                 if (OpcodeBuffer->Index + 2 >= OpcodeBuffer->Size)
@@ -191,7 +191,8 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer)
                 }
                 u8 ThirdByte = OpcodeBuffer->Data[OpcodeBuffer->Index + 2];
                 /* TODO: handle wide W=1 immediate, which needs to look at a third byte */
-                Immediate = (ThirdByte << 8) | SecondByte;
+                Immediate = ((0b11111111 & ThirdByte) << 8) | (SecondByte & 0b11111111);
+                InstructionLength = 3;
             }
             printf("mov %s, %d\n", DisplayRegisterName(DestinationRegister), Immediate);
         } break;
