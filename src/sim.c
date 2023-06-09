@@ -124,11 +124,6 @@ s32 EffectiveAddressCalculationTable[MOD_COUNT][RM_COUNT] = {
     },
 };
 
-static s32 GetInstructionLength(buffer *OpcodeBuffer)
-{
-    return 2;
-}
-
 static s32 SimulateBuffer(buffer *OpcodeBuffer)
 {
     /* TODO: define simulated values as s16 since it should run in 16-bit mode eventually */
@@ -138,7 +133,6 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer)
     {
         if(OpcodeBuffer->Index >= OpcodeBuffer->Size)
         {
-            /* check (Size - 1) because we assume the opcode is at least two bytes long */
             /* TODO: there should be an error here sometimes. Like if there is a lone byte at the end of the instruction stream */
             break;
         }
@@ -147,8 +141,7 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer)
         opcode Opcode = OpcodeTable[OpcodeValue];
         s16 D = GET_D(FirstByte);
         s16 W = GET_W(FirstByte);
-        /* printf("%x %x\n", FirstByte, SecondByte); */
-        s32 InstructionLength = GetInstructionLength(OpcodeBuffer);
+        s32 InstructionLength = 2; /* we just guess that InstructionLength is 2 and update it in places where it is not */
         switch(Opcode.Kind)
         {
         case opcode_kind_RegisterMemoryToFromRegister:
@@ -167,7 +160,7 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer)
             }
             else
             {
-                printf("opcode_kind_RegisterMemoryToFromRegister: Unimplemented!\n");
+                printf("Unimplemented: %s\n", DisplayOpcodeKind(Opcode.Kind));
                 return -1;
             }
         } break;
@@ -220,9 +213,11 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer)
 static s32 TestSim(void)
 {
     s32 SimResult = 0;
-    buffer *Buffer = ReadFileIntoBuffer("../assets/listing_0039_more_movs");
+    char *FilePath = "../assets/listing_0039_more_movs";
+    buffer *Buffer = ReadFileIntoBuffer(FilePath);
     if(!Buffer)
     {
+        printf("Error reading file %s\n", FilePath);
         return 1;
     }
     SimResult = SimulateBuffer(Buffer);
