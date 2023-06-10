@@ -195,7 +195,6 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer)
                 s16 DestinationRegister = RegTable[REG][W];
                 effective_address EffectiveAddress = EffectiveAddressCalculationTable[MOD][RM];
                 char *EffectiveAddressDisplay = GetEffectiveAddressDisplay(EffectiveAddress);
-                /* printf("D %d W %d MOD %d REG %d R/M %d\n", D, W, MOD, REG, RM); */
                 if (MOD == 0b01 || MOD == 0b10)
                 {
                     if (OpcodeBuffer->Index + 2 >= OpcodeBuffer->Size)
@@ -204,7 +203,6 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer)
                         return -1;
                     }
                     u8 ThirdByte = OpcodeBuffer->Data[OpcodeBuffer->Index + 2];
-                    /* printf("ThirdByte %d\n", ThirdByte); */
                     u8 FourthByte;
                     s16 Immediate = (ThirdByte << 24) >> 24;
                     InstructionLength = 3;
@@ -220,11 +218,9 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer)
                         {
                             FourthByte = OpcodeBuffer->Data[OpcodeBuffer->Index + 3];
                             FourthByte = (FourthByte << 24) >> 24;
-                            /* printf("FourthByte %d\n", FourthByte); */
                             Immediate = ((0b11111111 & FourthByte) << 8) | (ThirdByte & 0b11111111);
                         }
                     }
-                    /* printf("Immediate %d\n", Immediate); */
                     if (D)
                     {
                         printf("mov %s, %s %d]\n", DisplayRegisterName(DestinationRegister), EffectiveAddressDisplay, Immediate);
