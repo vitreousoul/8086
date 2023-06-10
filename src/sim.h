@@ -62,7 +62,7 @@ typedef enum
     eac_DI_D16,
     eac_BP_D16,
     eac_BX_D16,
-} effective_address_calculation;
+} effective_address;
 
 static char *DisplayOpcodeKind(opcode_kind Kind)
 {

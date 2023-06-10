@@ -124,6 +124,38 @@ s32 EffectiveAddressCalculationTable[MOD_COUNT][RM_COUNT] = {
     },
 };
 
+static char *GetEffectiveAddressDisplay(effective_address EffectiveAddress)
+{
+    switch(EffectiveAddress)
+    {
+    case eac_NONE: return "eac_NONE";
+    case eac_BX_SI: return "[bx + si]";
+    case eac_BX_DI: return "[bx + di]";
+    case eac_BP_SI: return "[bp + si]";
+    case eac_BP_DI: return "[bp + di]";
+    case eac_SI: return "[si]";
+    case eac_DI: return "[di]";
+    case eac_DIRECT_ADDRESS: return "eac_DIRECT_ADDRESS";
+    case eac_BX: return "[bx]";
+    case eac_BX_SI_D8: return "[bx + si +";
+    case eac_BX_DI_D8: return "[bx + di +";
+    case eac_BP_SI_D8: return "[bp + si +";
+    case eac_BP_DI_D8: return "[bp + di +";
+    case eac_SI_D8: return "[si +";
+    case eac_DI_D8: return "[di +";
+    case eac_BP_D8: return "[bp +";
+    case eac_BX_D8: return "[bx +";
+    case eac_BX_SI_D16: return "[bx + si +";
+    case eac_BX_DI_D16: return "[bx + di +";
+    case eac_BP_SI_D16: return "[bp + si +";
+    case eac_BP_DI_D16: return "[bp + di +";
+    case eac_SI_D16: return "[si +";
+    case eac_DI_D16: return "[di +";
+    case eac_BP_D16: return "[bp +";
+    case eac_BX_D16: return "[bx +";
+    }
+}
+
 static s32 SimulateBuffer(buffer *OpcodeBuffer)
 {
     /* TODO: define simulated values as s16 since it should run in 16-bit mode eventually */
@@ -160,8 +192,59 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer)
             }
             else
             {
-                printf("Unimplemented: %s\n", DisplayOpcodeKind(Opcode.Kind));
-                return -1;
+                s16 DestinationRegister = RegTable[REG][W];
+                effective_address EffectiveAddress = EffectiveAddressCalculationTable[MOD][RM];
+                char *EffectiveAddressDisplay = GetEffectiveAddressDisplay(EffectiveAddress);
+                /* printf("D %d W %d MOD %d REG %d R/M %d\n", D, W, MOD, REG, RM); */
+                if (MOD == 0b01 || MOD == 0b10)
+                {
+                    if (OpcodeBuffer->Index + 2 >= OpcodeBuffer->Size)
+                    {
+                        printf("opcode_kind_RegisterMemoryToFromRegister unexpected end of buffer\n");
+                        return -1;
+                    }
+                    u8 ThirdByte = OpcodeBuffer->Data[OpcodeBuffer->Index + 2];
+                    /* printf("ThirdByte %d\n", ThirdByte); */
+                    u8 FourthByte;
+                    s16 Immediate = (ThirdByte << 24) >> 24;
+                    InstructionLength = 3;
+                    if (MOD == 0b10)
+                    {
+                        InstructionLength = 4;
+                        if (OpcodeBuffer->Index + 3 >= OpcodeBuffer->Size)
+                        {
+                            printf("opcode_kind_RegisterMemoryToFromRegister unexpected end of buffer\n");
+                            return -1;
+                        }
+                        else
+                        {
+                            FourthByte = OpcodeBuffer->Data[OpcodeBuffer->Index + 3];
+                            FourthByte = (FourthByte << 24) >> 24;
+                            /* printf("FourthByte %d\n", FourthByte); */
+                            Immediate = ((0b11111111 & FourthByte) << 8) | (ThirdByte & 0b11111111);
+                        }
+                    }
+                    /* printf("Immediate %d\n", Immediate); */
+                    if (D)
+                    {
+                        printf("mov %s, %s %d]\n", DisplayRegisterName(DestinationRegister), EffectiveAddressDisplay, Immediate);
+                    }
+                    else
+                    {
+                        printf("mov %s %d], %s\n", EffectiveAddressDisplay, Immediate, DisplayRegisterName(DestinationRegister));
+                    }
+                }
+                else
+                {
+                    if (D)
+                    {
+                        printf("mov %s, %s\n", DisplayRegisterName(DestinationRegister), EffectiveAddressDisplay);
+                    }
+                    else
+                    {
+                        printf("mov %s, %s\n", EffectiveAddressDisplay, DisplayRegisterName(DestinationRegister));
+                    }
+                }
             }
         } break;
         case opcode_kind_ImmediateToRegisterMemory:
