@@ -158,7 +158,6 @@ static char *GetEffectiveAddressDisplay(effective_address EffectiveAddress)
 
 static s32 SimulateBuffer(buffer *OpcodeBuffer)
 {
-    /* TODO: define simulated values as s16 since it should run in 16-bit mode eventually */
     s32 Result = 0;
     printf("bits 16\n");
     while(1)
@@ -262,7 +261,6 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer)
                     return -1;
                 }
                 u8 ThirdByte = OpcodeBuffer->Data[OpcodeBuffer->Index + 2];
-                /* TODO: handle wide W=1 immediate, which needs to look at a third byte */
                 Immediate = ((0b11111111 & ThirdByte) << 8) | (SecondByte & 0b11111111);
                 InstructionLength = 3;
             }
@@ -292,7 +290,8 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer)
 static s32 TestSim(void)
 {
     s32 SimResult = 0;
-    char *FilePath = "../assets/listing_0039_more_movs";
+    /* char *FilePath = "../assets/listing_0039_more_movs"; */
+    char *FilePath = "../assets/listing_0040_challenge_movs";
     buffer *Buffer = ReadFileIntoBuffer(FilePath);
     if(!Buffer)
     {
