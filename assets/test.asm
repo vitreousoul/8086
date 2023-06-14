@@ -1,4 +1,3 @@
 bits 16
 
-;; mov cx, bx
-mov ch, -12
+mov [bp + di], byte 7
