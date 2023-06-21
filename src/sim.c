@@ -243,8 +243,26 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer)
             }
         } break;
         case opcode_kind_ImmediateToRegisterMemory:
-            printf("opcode_kind_ImmediateToRegisterMemory\n");
+        {
+            s32 ByteLength = W ? 6 : 5;
+            if (OpcodeBuffer->Index + (ByteLength - 1) >= OpcodeBuffer->Size)
+            {
+                printf("Unexpected end-of-stream while parsing opcode_kind_ImmediateToRegisterMemory\n");
+            }
+            printf("opcode_kind_ImmediateToRegisterMemory ");
+            DEBUG_PrintByteInBinary(FirstByte); printf(" ");
+            u8 SecondByte = OpcodeBuffer->Data[OpcodeBuffer->Index + 1];
+            DEBUG_PrintByteInBinary(SecondByte); printf(" ");
+            u8 ThirdByte = OpcodeBuffer->Data[OpcodeBuffer->Index + 2];
+            DEBUG_PrintByteInBinary(ThirdByte); printf(" ");
+            u8 FourthByte = OpcodeBuffer->Data[OpcodeBuffer->Index + 3];
+            DEBUG_PrintByteInBinary(FourthByte); printf(" ");
+            u8 FifthByte = OpcodeBuffer->Data[OpcodeBuffer->Index + 4];
+            DEBUG_PrintByteInBinary(FifthByte); printf(" ");
+            u8 SixthByte = W ? OpcodeBuffer->Data[OpcodeBuffer->Index + 5] : 0;
+            if (W) DEBUG_PrintByteInBinary(SixthByte); printf("\n");
             return -1;
+        }
         case opcode_kind_ImmediateToRegister:
         {
             u8 SecondByte = OpcodeBuffer->Data[OpcodeBuffer->Index + 1];
@@ -290,8 +308,8 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer)
 static s32 TestSim(void)
 {
     s32 SimResult = 0;
-    /* char *FilePath = "../assets/listing_0039_more_movs"; */
-    char *FilePath = "../assets/listing_0040_challenge_movs";
+    char *FilePath = "../assets/listing_0039_more_movs";
+    /* char *FilePath = "../assets/listing_0040_challenge_movs"; */
     buffer *Buffer = ReadFileIntoBuffer(FilePath);
     if(!Buffer)
     {

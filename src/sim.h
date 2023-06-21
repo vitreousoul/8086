@@ -102,3 +102,12 @@ static char *DisplayRegisterName(register_name Name)
     case UNKNOWN_REGISTER: return "UNKNOWN_REGISTER";
     }
 }
+
+static void DEBUG_PrintByteInBinary(u8 Byte)
+{
+    s32 I;
+    for (I = 7; I >= 0; --I)
+    {
+        printf("%d", (Byte >> I) & 0b1);
+    };
+}
