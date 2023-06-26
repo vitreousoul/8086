@@ -106,8 +106,10 @@ static char *DisplayRegisterName(register_name Name)
 static void DEBUG_PrintByteInBinary(u8 Byte)
 {
     s32 I;
+    printf(" ");
     for (I = 7; I >= 0; --I)
     {
         printf("%d", (Byte >> I) & 0b1);
     };
+    printf(" ");
 }

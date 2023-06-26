@@ -156,6 +156,25 @@ static char *GetEffectiveAddressDisplay(effective_address EffectiveAddress)
     }
 }
 
+static s32 ErrorMessageAndCode(char *Message, s32 Code)
+{
+    printf("%s", Message);
+    return Code;
+}
+
+static GetImmediate(buffer *OpcodeBuffer, s32 Offset, s32 IsWord)
+{
+    s32 FirstImmediateByte = OpcodeBuffer->Data[OpcodeBuffer->Index + Offset];
+    s16 Immediate = (FirstImmediateByte << 24) >> 24;
+    if (IsWord)
+    {
+        u8 SecondImmediateByte = OpcodeBuffer->Data[OpcodeBuffer->Index + Offset + 1];
+        s16 ImmediateHigh = (SecondImmediateByte << 24) >> 24;
+        Immediate = ((0b11111111 & SecondImmediateByte) << 8) | (ImmediateHigh & 0b11111111);
+    }
+    return Immediate;
+}
+
 static s32 SimulateBuffer(buffer *OpcodeBuffer)
 {
     s32 Result = 0;
@@ -202,7 +221,6 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer)
                         return -1;
                     }
                     u8 ThirdByte = OpcodeBuffer->Data[OpcodeBuffer->Index + 2];
-                    u8 FourthByte;
                     s16 Immediate = (ThirdByte << 24) >> 24;
                     InstructionLength = 3;
                     if (MOD == 0b10)
@@ -215,7 +233,7 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer)
                         }
                         else
                         {
-                            FourthByte = OpcodeBuffer->Data[OpcodeBuffer->Index + 3];
+                            u8 FourthByte = OpcodeBuffer->Data[OpcodeBuffer->Index + 3];
                             FourthByte = (FourthByte << 24) >> 24;
                             Immediate = ((0b11111111 & FourthByte) << 8) | (ThirdByte & 0b11111111);
                         }
@@ -244,25 +262,49 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer)
         } break;
         case opcode_kind_ImmediateToRegisterMemory:
         {
-            s32 ByteLength = W ? 6 : 5;
-            if (OpcodeBuffer->Index + (ByteLength - 1) >= OpcodeBuffer->Size)
+            // TODO: update InstructionLength for all paths
+            if (OpcodeBuffer->Index + 1 > OpcodeBuffer->Size)
             {
-                printf("Unexpected end-of-stream while parsing opcode_kind_ImmediateToRegisterMemory\n");
+                return ErrorMessageAndCode("Unexpected end-of-stream while parsing opcode_kind_ImmediateToRegisterMemory", 1);
             }
-            printf("opcode_kind_ImmediateToRegisterMemory ");
-            DEBUG_PrintByteInBinary(FirstByte); printf(" ");
             u8 SecondByte = OpcodeBuffer->Data[OpcodeBuffer->Index + 1];
-            DEBUG_PrintByteInBinary(SecondByte); printf(" ");
-            u8 ThirdByte = OpcodeBuffer->Data[OpcodeBuffer->Index + 2];
-            DEBUG_PrintByteInBinary(ThirdByte); printf(" ");
-            u8 FourthByte = OpcodeBuffer->Data[OpcodeBuffer->Index + 3];
-            DEBUG_PrintByteInBinary(FourthByte); printf(" ");
-            u8 FifthByte = OpcodeBuffer->Data[OpcodeBuffer->Index + 4];
-            DEBUG_PrintByteInBinary(FifthByte); printf(" ");
-            u8 SixthByte = W ? OpcodeBuffer->Data[OpcodeBuffer->Index + 5] : 0;
-            if (W) DEBUG_PrintByteInBinary(SixthByte); printf("\n");
-            return -1;
-        }
+            char *ImmediateSizeName = W ? "word" : "byte";
+            s16 MOD = GET_MOD(SecondByte);
+            s16 RM = GET_RM(SecondByte);
+            if(MOD == 0b11)
+            {
+                s32 NeededByteCount = W ? 3 : 2;
+                if (OpcodeBuffer->Index + NeededByteCount > OpcodeBuffer->Size)
+                {
+                    return ErrorMessageAndCode("Unexpected end-of-stream while parsing opcode_kind_ImmediateToRegisterMemory", 1);
+                }
+                InstructionLength = W ? 4 : 3;
+                s16 Immediate = GetImmediate(OpcodeBuffer, 2, W);
+                s16 DestinationRegister = RegTable[RM][W];
+                printf("mov %s, %s %d\n", DisplayRegisterName(DestinationRegister), ImmediateSizeName, Immediate);
+            }
+            else
+            {
+                effective_address EffectiveAddress = EffectiveAddressCalculationTable[MOD][RM];
+                char *EffectiveAddressDisplay = GetEffectiveAddressDisplay(EffectiveAddress);
+                if (MOD == 0b01 || MOD == 0b10)
+                {
+                    s16 Displacement = GetImmediate(OpcodeBuffer, 2, MOD == 0b10);
+                    if (OpcodeBuffer->Index + 2 >= OpcodeBuffer->Size)
+                    {
+                        return ErrorMessageAndCode("opcode_kind_ImmediateToRegisterMemory unexpected end of buffer\n", 1);
+                    }
+                    return ErrorMessageAndCode("MOD == 0b01 || MOD == 0b10 not implemented!!!!\n", 1);
+                }
+                else
+                {
+                    // MOD == 0b00
+                    s16 Immediate = GetImmediate(OpcodeBuffer, 2, W);
+                    InstructionLength = W ? 4 : 3;
+                    printf("mov %s, %s %d\n", EffectiveAddressDisplay, ImmediateSizeName, Immediate);
+                }
+            }
+        } break;
         case opcode_kind_ImmediateToRegister:
         {
             u8 SecondByte = OpcodeBuffer->Data[OpcodeBuffer->Index + 1];
@@ -308,8 +350,8 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer)
 static s32 TestSim(void)
 {
     s32 SimResult = 0;
-    char *FilePath = "../assets/listing_0039_more_movs";
-    /* char *FilePath = "../assets/listing_0040_challenge_movs"; */
+    /* char *FilePath = "../assets/listing_0039_more_movs"; */
+    char *FilePath = "../assets/listing_0040_challenge_movs";
     buffer *Buffer = ReadFileIntoBuffer(FilePath);
     if(!Buffer)
     {
