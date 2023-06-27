@@ -169,8 +169,7 @@ static GetImmediate(buffer *OpcodeBuffer, s32 Offset, s32 IsWord)
     if (IsWord)
     {
         u8 SecondImmediateByte = OpcodeBuffer->Data[OpcodeBuffer->Index + Offset + 1];
-        s16 ImmediateHigh = (SecondImmediateByte << 24) >> 24;
-        Immediate = ((0b11111111 & SecondImmediateByte) << 8) | (ImmediateHigh & 0b11111111);
+        Immediate = ((0b11111111 & SecondImmediateByte) << 8) | (Immediate & 0b11111111);
     }
     return Immediate;
 }
@@ -217,8 +216,7 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer)
                 {
                     if (OpcodeBuffer->Index + 2 >= OpcodeBuffer->Size)
                     {
-                        printf("opcode_kind_RegisterMemoryToFromRegister unexpected end of buffer\n");
-                        return -1;
+                        return ErrorMessageAndCode("opcode_kind_RegisterMemoryToFromRegister unexpected end of buffer\n", 1);
                     }
                     u8 ThirdByte = OpcodeBuffer->Data[OpcodeBuffer->Index + 2];
                     s16 Immediate = (ThirdByte << 24) >> 24;
@@ -228,8 +226,7 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer)
                         InstructionLength = 4;
                         if (OpcodeBuffer->Index + 3 >= OpcodeBuffer->Size)
                         {
-                            printf("opcode_kind_RegisterMemoryToFromRegister unexpected end of buffer\n");
-                            return -1;
+                            return ErrorMessageAndCode("opcode_kind_RegisterMemoryToFromRegister unexpected end of buffer\n", -1);
                         }
                         else
                         {
@@ -262,7 +259,6 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer)
         } break;
         case opcode_kind_ImmediateToRegisterMemory:
         {
-            // TODO: update InstructionLength for all paths
             if (OpcodeBuffer->Index + 1 > OpcodeBuffer->Size)
             {
                 return ErrorMessageAndCode("Unexpected end-of-stream while parsing opcode_kind_ImmediateToRegisterMemory", 1);
@@ -289,12 +285,16 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer)
                 char *EffectiveAddressDisplay = GetEffectiveAddressDisplay(EffectiveAddress);
                 if (MOD == 0b01 || MOD == 0b10)
                 {
-                    s16 Displacement = GetImmediate(OpcodeBuffer, 2, MOD == 0b10);
-                    if (OpcodeBuffer->Index + 2 >= OpcodeBuffer->Size)
+                    InstructionLength = W ? 6 : 5;
+                    s16 IsWideDisplacement = MOD == 0b10;
+                    s16 Displacement = GetImmediate(OpcodeBuffer, 2, IsWideDisplacement);
+                    s16 ImmediateOffset = MOD == 0b10 ? 4 : 3;
+                    if (OpcodeBuffer->Index + ImmediateOffset + W >= OpcodeBuffer->Size)
                     {
                         return ErrorMessageAndCode("opcode_kind_ImmediateToRegisterMemory unexpected end of buffer\n", 1);
                     }
-                    return ErrorMessageAndCode("MOD == 0b01 || MOD == 0b10 not implemented!!!!\n", 1);
+                    s16 Immediate = GetImmediate(OpcodeBuffer, ImmediateOffset, W);
+                    printf("mov %s %d] %s %d\n", EffectiveAddressDisplay, Displacement, ImmediateSizeName, Immediate);
                 }
                 else
                 {
@@ -308,17 +308,15 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer)
         case opcode_kind_ImmediateToRegister:
         {
             u8 SecondByte = OpcodeBuffer->Data[OpcodeBuffer->Index + 1];
-            /* u8 SignBit = (0b1 & (SecondByte >> 7)); */
             s16 REG = GET_IMMEDIATE_TO_REGISTER_REG(FirstByte);
             s16 W = GET_IMMEDIATE_TO_REGISTER_W((s32)FirstByte);
             s16 DestinationRegister = RegTable[REG][W];
-            s16 Immediate = (SecondByte << 24) >> 24; /* this feels dirty.... but it's a way to retain sign-extension */
+            s16 Immediate = (SecondByte << 24) >> 24;
             if (W)
             {
                 if (OpcodeBuffer->Index + 2 >= OpcodeBuffer->Size)
                 {
-                    printf("opcode_kind_ImmediateToRegister unexpected end of buffer\n");
-                    return -1;
+                    return ErrorMessageAndCode("opcode_kind_ImmediateToRegister unexpected end of buffer\n", -1);
                 }
                 u8 ThirdByte = OpcodeBuffer->Data[OpcodeBuffer->Index + 2];
                 Immediate = ((0b11111111 & ThirdByte) << 8) | (SecondByte & 0b11111111);
