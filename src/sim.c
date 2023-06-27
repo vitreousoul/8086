@@ -158,7 +158,7 @@ static char *GetEffectiveAddressDisplay(effective_address EffectiveAddress)
 
 static s32 ErrorMessageAndCode(char *Message, s32 Code)
 {
-    printf("%s", Message);
+    printf("ERROR: %s", Message);
     return Code;
 }
 
@@ -246,6 +246,19 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer)
                 }
                 else
                 {
+                    // NOTE: MOD == 0b00
+                    char DirectAddressDisplay[64];
+                    if (EffectiveAddress == eac_DIRECT_ADDRESS)
+                    {
+                        if (OpcodeBuffer->Index + 3 >= OpcodeBuffer->Size)
+                        {
+                            return ErrorMessageAndCode("opcode_kind_RegisterMemoryToFromRegister unexpected end of buffer\n", 1);
+                        }
+                        s16 Immediate = GetImmediate(OpcodeBuffer, 2, 1);
+                        sprintf(DirectAddressDisplay, "[%d]%c", Immediate, 0);
+                        EffectiveAddressDisplay = DirectAddressDisplay;
+                        InstructionLength = 4;
+                    }
                     if (D)
                     {
                         printf("mov %s, %s\n", DisplayRegisterName(DestinationRegister), EffectiveAddressDisplay);
@@ -283,6 +296,10 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer)
             {
                 effective_address EffectiveAddress = EffectiveAddressCalculationTable[MOD][RM];
                 char *EffectiveAddressDisplay = GetEffectiveAddressDisplay(EffectiveAddress);
+                if (EffectiveAddress == eac_DIRECT_ADDRESS)
+                {
+                    return ErrorMessageAndCode("eac_DIRECT_ADDRESS not implemented\n", 1);
+                }
                 if (MOD == 0b01 || MOD == 0b10)
                 {
                     InstructionLength = W ? 6 : 5;
