@@ -311,7 +311,7 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer)
                         return ErrorMessageAndCode("opcode_kind_ImmediateToRegisterMemory unexpected end of buffer\n", 1);
                     }
                     s16 Immediate = GetImmediate(OpcodeBuffer, ImmediateOffset, W);
-                    printf("mov %s %d] %s %d\n", EffectiveAddressDisplay, Displacement, ImmediateSizeName, Immediate);
+                    printf("mov %s %d], %s %d\n", EffectiveAddressDisplay, Displacement, ImmediateSizeName, Immediate);
                 }
                 else
                 {
@@ -342,19 +342,28 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer)
             printf("mov %s, %d\n", DisplayRegisterName(DestinationRegister), Immediate);
         } break;
         case opcode_kind_MemoryAccumulator:
-            printf("opcode_kind_MemoryAccumulator\n");
-            return -1;
-        case opcode_kind_SegmentRegister:
-            printf("opcode_kind_SegmentRegister\n");
-            return -1;
-        case opcode_kind_RegisterToRegisterMemory:
-            printf("opcode_kind_RegisterToRegisterMemory\n");
-            return -1;
-        default:
         {
-            printf("Error\n");
-            return -1;
-        }
+            if (OpcodeBuffer->Index + 2 >= OpcodeBuffer->Size)
+            {
+                return ErrorMessageAndCode("opcode_kind_MemoryAccumulator unexpected end of buffer\n", 1);
+            }
+            InstructionLength = 3;
+            s16 Immediate = GetImmediate(OpcodeBuffer, 1, 1);
+            if (D)
+            {
+                printf("mov [%d], ax\n", Immediate);
+            }
+            else
+            {
+                printf("mov ax, [%d]\n", Immediate);
+            }
+        } break;
+        case opcode_kind_SegmentRegister:
+            return ErrorMessageAndCode("opcode_kind_SegmentRegister not implemented\n", -1);
+        case opcode_kind_RegisterToRegisterMemory:
+            return ErrorMessageAndCode("opcode_kind_RegisterToRegisterMemory not implemented\n", -1);
+        default:
+            return ErrorMessageAndCode("SimulateBuffer default error\n", -1);
         }
         OpcodeBuffer->Index += InstructionLength;
     }
