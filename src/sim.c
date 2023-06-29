@@ -214,27 +214,13 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer)
                 char *EffectiveAddressDisplay = GetEffectiveAddressDisplay(EffectiveAddress);
                 if (MOD == 0b01 || MOD == 0b10)
                 {
-                    if (OpcodeBuffer->Index + 2 >= OpcodeBuffer->Size)
+                    s32 LastByteOffset = MOD == 0b10 ? 3 : 2;
+                    if (OpcodeBuffer->Index + LastByteOffset >= OpcodeBuffer->Size)
                     {
                         return ErrorMessageAndCode("opcode_kind_RegisterMemoryToFromRegister unexpected end of buffer\n", 1);
                     }
-                    u8 ThirdByte = OpcodeBuffer->Data[OpcodeBuffer->Index + 2];
-                    s16 Immediate = (ThirdByte << 24) >> 24;
-                    InstructionLength = 3;
-                    if (MOD == 0b10)
-                    {
-                        InstructionLength = 4;
-                        if (OpcodeBuffer->Index + 3 >= OpcodeBuffer->Size)
-                        {
-                            return ErrorMessageAndCode("opcode_kind_RegisterMemoryToFromRegister unexpected end of buffer\n", -1);
-                        }
-                        else
-                        {
-                            u8 FourthByte = OpcodeBuffer->Data[OpcodeBuffer->Index + 3];
-                            FourthByte = (FourthByte << 24) >> 24;
-                            Immediate = ((0b11111111 & FourthByte) << 8) | (ThirdByte & 0b11111111);
-                        }
-                    }
+                    InstructionLength = MOD == 0b10 ? 4 : 3;
+                    s16 Immediate = GetImmediate(OpcodeBuffer, 2, MOD == 0b10);
                     if (D)
                     {
                         printf("mov %s, %s %d]\n", DisplayRegisterName(DestinationRegister), EffectiveAddressDisplay, Immediate);
@@ -374,8 +360,8 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer)
 static s32 TestSim(void)
 {
     s32 SimResult = 0;
-    /* char *FilePath = "../assets/listing_0039_more_movs"; */
-    char *FilePath = "../assets/listing_0040_challenge_movs";
+    char *FilePath = "../assets/listing_0039_more_movs";
+    /* char *FilePath = "../assets/listing_0040_challenge_movs"; */
     buffer *Buffer = ReadFileIntoBuffer(FilePath);
     if(!Buffer)
     {
