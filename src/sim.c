@@ -310,21 +310,16 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer)
         } break;
         case opcode_kind_ImmediateToRegister:
         {
-            u8 SecondByte = OpcodeBuffer->Data[OpcodeBuffer->Index + 1];
             s16 REG = GET_IMMEDIATE_TO_REGISTER_REG(FirstByte);
             s16 W = GET_IMMEDIATE_TO_REGISTER_W((s32)FirstByte);
             s16 DestinationRegister = RegTable[REG][W];
-            s16 Immediate = (SecondByte << 24) >> 24;
-            if (W)
+            s32 OverflowCheckOffset = W ? 2 : 1;
+            if (OpcodeBuffer->Index + OverflowCheckOffset >= OpcodeBuffer->Size)
             {
-                if (OpcodeBuffer->Index + 2 >= OpcodeBuffer->Size)
-                {
-                    return ErrorMessageAndCode("opcode_kind_ImmediateToRegister unexpected end of buffer\n", -1);
-                }
-                u8 ThirdByte = OpcodeBuffer->Data[OpcodeBuffer->Index + 2];
-                Immediate = ((0b11111111 & ThirdByte) << 8) | (SecondByte & 0b11111111);
-                InstructionLength = 3;
+                return ErrorMessageAndCode("opcode_kind_ImmediateToRegister unexpected end of buffer\n", -1);
             }
+            s16 Immediate = GetImmediate(OpcodeBuffer, 1, W);
+            InstructionLength = W ? 3 : 2;
             printf("mov %s, %d\n", DisplayRegisterName(DestinationRegister), Immediate);
         } break;
         case opcode_kind_MemoryAccumulator:
