@@ -9,6 +9,8 @@ typedef int16_t s16;
 
 typedef size_t size;
 
+#define ARRAY_COUNT(a) ((s32)(sizeof(a) / sizeof((a)[0])))
+
 typedef enum
 {
    opcode_kind_None,
