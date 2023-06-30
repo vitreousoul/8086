@@ -23,6 +23,7 @@ typedef enum
 typedef struct
 {
     opcode_kind Kind;
+    char *Name;
 } opcode;
 
 typedef enum
