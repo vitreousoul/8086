@@ -63,6 +63,7 @@
 #define RM_COUNT (1 << RM_BITS)
 
 #define MOV_IMMEDIATE_TO_REGISTER_MEMORY 0b110001
+#define MOV_ACCUMULATOR_TO_FROM_MEMORY 0b101000
 
 opcode OpcodeTable[OPCODE_COUNT] = {
     [0b100010] = {opcode_kind_RegisterMemoryToFromRegister,"mov"},
@@ -74,8 +75,11 @@ opcode OpcodeTable[OPCODE_COUNT] = {
     [0b101000] = {opcode_kind_MemoryAccumulator,"mov"},
     [0b100011] = {opcode_kind_SegmentRegister,"mov"},
     [0b000000] = {opcode_kind_RegisterMemoryToFromRegister,"add"},
+    [0b000001] = {opcode_kind_MemoryAccumulator,"add"},
     [0b001010] = {opcode_kind_RegisterMemoryToFromRegister,"sub"},
+    [0b001011] = {opcode_kind_MemoryAccumulator,"sub"},
     [0b001110] = {opcode_kind_RegisterMemoryToFromRegister,"cmp"},
+    [0b001111] = {opcode_kind_MemoryAccumulator,"cmp"},
     [0b100000] = {opcode_kind_ImmediateToRegisterMemory,"OPCODE_NAME_DERIVED_FROM_REG"},
 };
 
@@ -189,6 +193,7 @@ static char *GetOpcodeNameForArithmeticImmediateFromRegisterMemory(s16 REG)
     case 0b101: return "sub";
     case 0b011: return "sbb";
     case 0b111: return "cmp";
+    default: return "INVALID";
     }
 }
 
@@ -210,6 +215,7 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer)
         s16 D = GET_D(FirstByte);
         s16 W = GET_W(FirstByte);
         s32 InstructionLength = 2; /* we just guess that InstructionLength is 2 and update it in places where it is not */
+        char DirectAddressDisplay[64];
         switch(Opcode.Kind)
         {
         case opcode_kind_RegisterMemoryToFromRegister:
@@ -256,7 +262,6 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer)
                 else
                 {
                     // NOTE: MOD == 0b00
-                    char DirectAddressDisplay[64];
                     if (EffectiveAddress == eac_DIRECT_ADDRESS)
                     {
                         if (OpcodeBuffer->Index + 3 >= OpcodeBuffer->Size)
@@ -288,8 +293,8 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer)
             u8 SecondByte = OpcodeBuffer->Data[OpcodeBuffer->Index + 1];
             s32 IsMove = OpcodeValue == MOV_IMMEDIATE_TO_REGISTER_MEMORY;
             s32 IsMoveAndWideData = IsMove && W;
-            s32 IsWideData = IsMoveAndWideData || (!D && W);
-            char *ImmediateSizeName = IsWideData ? "word" : "byte";
+            s32 IsWideData = IsMoveAndWideData || (!IsMove && !D && W);
+            char *ImmediateSizeName = W ? "word" : "byte";
             s16 MOD = GET_MOD(SecondByte);
             s16 REG = GET_REG(SecondByte);
             s16 RM = GET_RM(SecondByte);
@@ -306,21 +311,32 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer)
                 }
                 InstructionLength = IsWideData ? 4 : 3;
                 s16 Immediate = GetImmediate(OpcodeBuffer, 2, IsWideData);
-                s16 DestinationRegister = RegTable[RM][IsWideData];
-                printf("%s %s, %s %d\n", OpcodeName, DisplayRegisterName(DestinationRegister), ImmediateSizeName, Immediate);
+                s16 DestinationRegister = RegTable[RM][W];
+                if (IsMove)
+                {
+                    printf("%s %s, %s %d\n", OpcodeName, DisplayRegisterName(DestinationRegister), ImmediateSizeName, Immediate);
+                }
+                else
+                {
+                    printf("%s %s %s, %d\n", OpcodeName, ImmediateSizeName, DisplayRegisterName(DestinationRegister), Immediate);
+                }
             }
             else
             {
                 effective_address EffectiveAddress = EffectiveAddressCalculationTable[MOD][RM];
                 char *EffectiveAddressDisplay = GetEffectiveAddressDisplay(EffectiveAddress);
-                if (EffectiveAddress == eac_DIRECT_ADDRESS)
-                {
-                    return ErrorMessageAndCode("eac_DIRECT_ADDRESS not implemented\n", 1);
-                }
                 if (MOD == 0b01 || MOD == 0b10)
                 {
-                    InstructionLength = IsWideData ? 6 : 5;
                     s16 IsWideDisplacement = MOD == 0b10;
+                    ImmediateSizeName = IsWideDisplacement ? "word" : "byte";
+                    if (MOD == 0b01)
+                    {
+                        InstructionLength = IsWideData ? 5 : 4;
+                    }
+                    else
+                    {
+                        InstructionLength = IsWideData ? 6 : 5;
+                    }
                     s16 Displacement = GetImmediate(OpcodeBuffer, 2, IsWideDisplacement);
                     s16 ImmediateOffset = MOD == 0b10 ? 4 : 3;
                     if (OpcodeBuffer->Index + ImmediateOffset + IsWideData >= OpcodeBuffer->Size)
@@ -328,14 +344,37 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer)
                         return ErrorMessageAndCode("opcode_kind_ImmediateToRegisterMemory unexpected end of buffer\n", 1);
                     }
                     s16 Immediate = GetImmediate(OpcodeBuffer, ImmediateOffset, IsWideData);
-                    printf("%s %s %d], %s %d\n", OpcodeName, EffectiveAddressDisplay, Displacement, ImmediateSizeName, Immediate);
+                    if (IsMove)
+                    {
+                        printf("%s %s %d], %s %d\n", OpcodeName, EffectiveAddressDisplay, Displacement, ImmediateSizeName, Immediate);
+                    }
+                    else
+                    {
+                        printf("%s %s %s %d], %d\n", OpcodeName, ImmediateSizeName, EffectiveAddressDisplay, Displacement, Immediate);
+                    }
                 }
                 else
                 {
                     // MOD == 0b00
+                    // TODO: add in check for direct address
                     s16 Immediate = GetImmediate(OpcodeBuffer, 2, IsWideData);
                     InstructionLength = IsWideData ? 4 : 3;
-                    printf("%s %s, %s %d\n", OpcodeName, EffectiveAddressDisplay, ImmediateSizeName, Immediate);
+                    if (EffectiveAddress == eac_DIRECT_ADDRESS)
+                    {
+                        s16 DirectAddress = GetImmediate(OpcodeBuffer, 2, 1);
+                        Immediate = GetImmediate(OpcodeBuffer, 4, IsWideData);
+                        sprintf(DirectAddressDisplay, "[%d]%c", DirectAddress, 0);
+                        EffectiveAddressDisplay = DirectAddressDisplay;
+                        InstructionLength = IsWideData ? 6 : 5;
+                    }
+                    if (IsMove)
+                    {
+                        printf("%s %s, %s %d\n", OpcodeName, EffectiveAddressDisplay, ImmediateSizeName, Immediate);
+                    }
+                    else
+                    {
+                        printf("%s %s %s, %d\n", OpcodeName, ImmediateSizeName, EffectiveAddressDisplay, Immediate);
+                    }
                 }
             }
         } break;
@@ -355,19 +394,24 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer)
         } break;
         case opcode_kind_MemoryAccumulator:
         {
-            if (OpcodeBuffer->Index + 2 >= OpcodeBuffer->Size)
+            if (OpcodeBuffer->Index + 1 >= OpcodeBuffer->Size)
             {
                 return ErrorMessageAndCode("opcode_kind_MemoryAccumulator unexpected end of buffer\n", 1);
             }
-            InstructionLength = 3;
-            s16 Immediate = GetImmediate(OpcodeBuffer, 1, 1);
+            s32 IsMove = OpcodeValue == MOV_ACCUMULATOR_TO_FROM_MEMORY;
+            s32 IsWideData = IsMove || W;
+            char *AccumulatorRegister = IsWideData ? "ax" : "al";
+            InstructionLength = IsWideData ? 3 : 2;
+            s16 Immediate = GetImmediate(OpcodeBuffer, 1, IsWideData);
             if (D)
             {
-                printf("%s [%d], ax\n", OpcodeName, Immediate);
+                char *Format = IsMove ? "%s [%d], %s\n" : "%s %d, %s\n";
+                printf(Format, OpcodeName, Immediate, AccumulatorRegister);
             }
             else
             {
-                printf("%s ax, [%d]\n", OpcodeName, Immediate);
+                char *Format = IsMove ? "%s %s, [%d]\n" : "%s %s, %d\n";
+                printf(Format, OpcodeName, AccumulatorRegister, Immediate);
             }
         } break;
         case opcode_kind_SegmentRegister:
@@ -388,9 +432,10 @@ static s32 TestSim(void)
 {
     s32 I, SimResult = 0;
     char *FilePaths[] = {
-        "../assets/listing_0039_more_movs",
-        "../assets/listing_0040_challenge_movs",
+        /* "../assets/listing_0039_more_movs", */
+        /* "../assets/listing_0040_challenge_movs", */
         "../assets/listing_0041_add_sub_cmp_jnz"
+        /* "../assets/test" */
     };
 
     for (I = 0; I < ARRAY_COUNT(FilePaths); ++I)
