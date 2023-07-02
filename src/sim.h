@@ -19,7 +19,8 @@ typedef enum
    opcode_kind_ImmediateToRegister,
    opcode_kind_MemoryAccumulator,
    opcode_kind_SegmentRegister,
-   opcode_kind_RegisterToRegisterMemory
+   opcode_kind_RegisterToRegisterMemory,
+   opcode_kind_Jump,
 } opcode_kind;
 
 typedef struct

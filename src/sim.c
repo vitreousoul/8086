@@ -3,6 +3,7 @@
   https://archive.org/details/bitsavers_intel80869lyUsersManualOct79_62967963
 */
 
+
 #include "sim.h"
 #include "platform.c"
 
@@ -81,6 +82,11 @@ opcode OpcodeTable[OPCODE_COUNT] = {
     [0b001110] = {opcode_kind_RegisterMemoryToFromRegister,"cmp"},
     [0b001111] = {opcode_kind_MemoryAccumulator,"cmp"},
     [0b100000] = {opcode_kind_ImmediateToRegisterMemory,"OPCODE_NAME_DERIVED_FROM_REG"},
+    [0b011101] = {opcode_kind_Jump,"DERIVED_OPCODE_NAME"},
+    [0b011111] = {opcode_kind_Jump,"DERIVED_OPCODE_NAME"},
+    [0b011100] = {opcode_kind_Jump,"DERIVED_OPCODE_NAME"},
+    [0b011110] = {opcode_kind_Jump,"DERIVED_OPCODE_NAME"},
+    [0b111000] = {opcode_kind_Jump,"DERIVED_OPCODE_NAME"},
 };
 
 s32 ModTable[MOD_COUNT] = {
@@ -132,6 +138,30 @@ s32 EffectiveAddressCalculationTable[MOD_COUNT][RM_COUNT] = {
         eac_BP_D16,
         eac_BX_D16,
     },
+};
+
+#define JUMP_CODE_BITS 8
+char *JumpInstructionNameTable[1 << JUMP_CODE_BITS] = {
+  [0b01110100] = "je", // jz
+  [0b01111100] = "jl", // jnge
+  [0b01111110] = "jle", // jng
+  [0b01110010] = "jb", // jnae
+  [0b01110110] = "jbe", // jna
+  [0b01111010] = "jp", // jpe
+  [0b01110000] = "jo",
+  [0b01111000] = "js",
+  [0b01110101] = "jne", // jnz
+  [0b01111101] = "jnl", // jge
+  [0b01111111] = "jnle", // jg
+  [0b01110011] = "jnb", // jae
+  [0b01110111] = "jnbe", // ja
+  [0b01111011] = "jnp", // jpo
+  [0b01110001] = "jno",
+  [0b01111001] = "jns",
+  [0b11100010] = "loop",
+  [0b11100001] = "loopz", // loope
+  [0b11100000] = "loopnz", // loopne
+  [0b11100011] = "jcxz",
 };
 
 static char *GetEffectiveAddressDisplay(effective_address EffectiveAddress)
@@ -418,6 +448,13 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer)
             return ErrorMessageAndCode("opcode_kind_SegmentRegister not implemented\n", -1);
         case opcode_kind_RegisterToRegisterMemory:
             return ErrorMessageAndCode("opcode_kind_RegisterToRegisterMemory not implemented\n", -1);
+        case opcode_kind_Jump:
+        {
+            char *JumpInstructionName = JumpInstructionNameTable[FirstByte];
+            s32 InstructionOffset = GetImmediate(OpcodeBuffer, 1, 0);
+            InstructionLength = 2;
+            printf("%s $+2+%d\n", JumpInstructionName, InstructionOffset);
+        } break;
         default:
             printf("FirstByte"); DEBUG_PrintByteInBinary(FirstByte); printf("\n");
             return ErrorMessageAndCode("SimulateBuffer default error\n", -1);
