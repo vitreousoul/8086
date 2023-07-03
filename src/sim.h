@@ -68,6 +68,12 @@ typedef enum
     eac_BX_D16,
 } effective_address;
 
+typedef enum
+{
+    simulation_mode_Print,
+    simulation_mode_Simulate,
+} simulation_mode;
+
 static char *DisplayOpcodeKind(opcode_kind Kind)
 {
     switch(Kind)
