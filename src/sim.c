@@ -70,18 +70,10 @@
 s16 GlobalRegisters[REGISTER_COUNT] = {};
 
 s32 RegisterIndexTable[32] = {
-    [AX] = 0,
-    [AH] = 0,
-    [AL] = 0,
-    [BX] = 1,
-    [BH] = 1,
-    [BL] = 1,
-    [CX] = 2,
-    [CH] = 2,
-    [CL] = 2,
-    [DX] = 3,
-    [DH] = 3,
-    [DL] = 3,
+    [AX] = 0, [AH] = 0, [AL] = 0,
+    [BX] = 1, [BH] = 1, [BL] = 1,
+    [CX] = 2, [CH] = 2, [CL] = 2,
+    [DX] = 3, [DH] = 3, [DL] = 3,
     [SP] = 4,
     [BP] = 5,
     [SI] = 6,
