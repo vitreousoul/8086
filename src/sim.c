@@ -66,18 +66,16 @@
 #define MOV_IMMEDIATE_TO_REGISTER_MEMORY 0b110001
 #define MOV_ACCUMULATOR_TO_FROM_MEMORY 0b101000
 
-#define REGISTER_COUNT 8
-s16 GlobalRegisters[REGISTER_COUNT] = {};
+#define REGISTER_COUNT 12
+u16 GlobalRegisters[REGISTER_COUNT] = {};
 
 s32 RegisterIndexTable[32] = {
     [AX] = 0, [AH] = 0, [AL] = 0,
     [BX] = 1, [BH] = 1, [BL] = 1,
     [CX] = 2, [CH] = 2, [CL] = 2,
     [DX] = 3, [DH] = 3, [DL] = 3,
-    [SP] = 4,
-    [BP] = 5,
-    [SI] = 6,
-    [DI] = 7,
+    [SP] = 4, [BP] = 5, [SI] = 6, [DI] = 7,
+    [CS] = 8, [DS] = 9, [SS] = 10, [ES] = 11,
 };
 
 opcode OpcodeTable[OPCODE_COUNT] = {
@@ -218,14 +216,40 @@ static s32 ErrorMessageAndCode(char *Message, s32 Code)
 
 static s16 GetImmediate(buffer *OpcodeBuffer, s32 Offset, s32 IsWord)
 {
-    s32 FirstImmediateByte = OpcodeBuffer->Data[OpcodeBuffer->Index + Offset];
-    s16 Immediate = (FirstImmediateByte << 24) >> 24;
+    u8 FirstImmediateByte = OpcodeBuffer->Data[OpcodeBuffer->Index + Offset];
     if (IsWord)
     {
         u8 SecondImmediateByte = OpcodeBuffer->Data[OpcodeBuffer->Index + Offset + 1];
-        Immediate = ((0b11111111 & SecondImmediateByte) << 8) | (Immediate & 0b11111111);
+        return ((0xff & SecondImmediateByte) << 8) | (FirstImmediateByte & 0xff);
     }
-    return Immediate;
+    else
+    {
+        return (FirstImmediateByte << 8) >> 8;
+    }
+}
+
+static s32 ReadRegister(register_name RegisterName)
+{
+    s32 RegisterIndex = RegisterIndexTable[RegisterName];
+    switch(RegisterName)
+    {
+    case AX: case BX: case CX: case DX:
+    case SP: case BP: case SI: case DI:
+    {
+        return GlobalRegisters[RegisterIndex];
+    } break;
+    case AH: case BH: case CH: case DH:
+    {
+        return 0xffff & ((GlobalRegisters[RegisterIndex] & 0xff00) >> 8);
+    } break;
+    case AL: case BL: case CL: case DL:
+    {
+        return GlobalRegisters[RegisterIndex] & 0xff;
+    } break;
+    case UNKNOWN_REGISTER: default:
+        return ErrorMessageAndCode("Write to unknown register\n", 1);
+    }
+    return 0;
 }
 
 static s32 WriteRegister(register_name RegisterName, s16 Value)
@@ -284,8 +308,11 @@ static s32 SimulateRegisterToRegister(simulation_mode Mode, char *OpcodeName, s1
     case simulation_mode_Print:
         printf("%s %s, %s\n", OpcodeName, DisplayRegisterName(DestinationRegister), DisplayRegisterName(SourceRegister));
         break;
+    case simulation_mode_Simulate:
+        WriteRegister(DestinationRegister, ReadRegister(SourceRegister));
+        break;
     default:
-        return ErrorMessageAndCode("SimulateRegisterToRegister not implemented!\n", 1);
+        return ErrorMessageAndCode("SimulateRegisterToRegister unknown simulation_mode!\n", 1);
     }
     return 0;
 }
@@ -312,9 +339,7 @@ static s32 SimulateRegisterAndEffectiveAddressWithOffset(simulation_mode Mode, c
     return 0;
 }
 
-static s32 SimulateRegisterAndEffectiveAddress(simulation_mode Mode, char *OpcodeName,
-                                                s16 DestinationRegister, effective_address EffectiveAddress,
-                                                s16 D, s32 IsDirectAddress, s16 Immediate)
+static s32 SimulateRegisterAndEffectiveAddress(simulation_mode Mode, char *OpcodeName, s16 DestinationRegister, effective_address EffectiveAddress, s16 D, s32 IsDirectAddress, s16 Immediate)
 {
     char DirectAddressDisplay[64];
     char *EffectiveAddressDisplay = GetEffectiveAddressDisplay(EffectiveAddress);
@@ -655,7 +680,7 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer, simulation_mode Mode)
         case opcode_kind_Jump:
         {
             char *JumpInstructionName = JumpInstructionNameTable[FirstByte];
-            s32 InstructionOffset = GetImmediate(OpcodeBuffer, 1, 0);
+            s16 InstructionOffset = GetImmediate(OpcodeBuffer, 1, 0);
             InstructionLength = 2;
             Result = SimulateJump(Mode, JumpInstructionName, InstructionOffset);
         } break;
@@ -677,7 +702,9 @@ static s32 TestSim(void)
         /* "../assets/listing_0039_more_movs", */
         /* "../assets/listing_0040_challenge_movs", */
         /* "../assets/listing_0041_add_sub_cmp_jnz", */
-        "../assets/listing_0043_immediate_movs",
+        /* "../assets/listing_0043_immediate_movs", */
+        /* "../assets/listing_0044_register_movs", */
+        "../assets/listing_0045_challenge_register_movs",
         /* "../assets/test" */
     };
 
