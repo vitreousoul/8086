@@ -350,31 +350,29 @@ static s32 SimulateRegisterAndEffectiveAddress(simulation_mode Mode, char *Opcod
     return 0;
 }
 
-static s32 SimulateImmediateToRegisterMemory(simulation_mode Mode, char *OpcodeName,
-                                        s16 DestinationRegister, char *ImmediateSizeName,
-                                        s16 Immediate, s32 IsMove)
+static s32 SimulateImmediateToRegisterMemory(simulation_mode Mode, char *OpcodeName, s16 DestinationRegister, char *ImmediateSizeName, s16 Immediate, s32 IsMove)
 {
     switch(Mode)
     {
     case simulation_mode_Print:
+    {
+        char *RegisterName = DisplayRegisterName(DestinationRegister);
         if (IsMove)
         {
-            printf("%s %s, %s %d\n", OpcodeName, DisplayRegisterName(DestinationRegister), ImmediateSizeName, Immediate);
+            printf("%s %s, %s %d\n", OpcodeName, RegisterName, ImmediateSizeName, Immediate);
         }
         else
         {
-            printf("%s %s %s, %d\n", OpcodeName, ImmediateSizeName, DisplayRegisterName(DestinationRegister), Immediate);
+            printf("%s %s %s, %d\n", OpcodeName, ImmediateSizeName, RegisterName, Immediate);
         }
-        break;
+    } break;
     default:
         return ErrorMessageAndCode("SimulateImmediateToRegisterMemory not implemented!\n", 1);
     }
     return 0;
 }
 
-static s32 SimulateImmediateToEffectiveAddressWithOffset(simulation_mode Mode, char *OpcodeName,
-                                        effective_address EffectiveAddress, char *ImmediateSizeName,
-                                        s16 Immediate, s16 Displacement, s32 IsMove)
+static s32 SimulateImmediateToEffectiveAddressWithOffset(simulation_mode Mode, char *OpcodeName, effective_address EffectiveAddress, char *ImmediateSizeName, s16 Immediate, s16 Displacement, s32 IsMove)
 {
     char *EffectiveAddressDisplay = GetEffectiveAddressDisplay(EffectiveAddress);
     switch(Mode)
@@ -396,9 +394,7 @@ static s32 SimulateImmediateToEffectiveAddressWithOffset(simulation_mode Mode, c
     return 0;
 }
 
-static s32 SimulateImmediateToEffectiveAddress(simulation_mode Mode, char *OpcodeName,
-                                               effective_address EffectiveAddress, char *ImmediateSizeName,
-                                               s16 Immediate, s32 IsMove, s32 IsDirectAddress, s16 DirectAddress)
+static s32 SimulateImmediateToEffectiveAddress(simulation_mode Mode, char *OpcodeName, effective_address EffectiveAddress, char *ImmediateSizeName, s16 Immediate, s32 IsMove, s32 IsDirectAddress, s16 DirectAddress)
 {
     char *EffectiveAddressDisplay = GetEffectiveAddressDisplay(EffectiveAddress);
     char DirectAddressDisplay[64];
