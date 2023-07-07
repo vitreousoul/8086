@@ -66,6 +66,28 @@
 #define MOV_IMMEDIATE_TO_REGISTER_MEMORY 0b110001
 #define MOV_ACCUMULATOR_TO_FROM_MEMORY 0b101000
 
+#define REGISTER_COUNT 8
+s16 GlobalRegisters[REGISTER_COUNT] = {};
+
+s32 RegisterIndexTable[32] = {
+    [AX] = 0,
+    [AH] = 0,
+    [AL] = 0,
+    [BX] = 1,
+    [BH] = 1,
+    [BL] = 1,
+    [CX] = 2,
+    [CH] = 2,
+    [CL] = 2,
+    [DX] = 3,
+    [DH] = 3,
+    [DL] = 3,
+    [SP] = 4,
+    [BP] = 5,
+    [SI] = 6,
+    [DI] = 7,
+};
+
 opcode OpcodeTable[OPCODE_COUNT] = {
     [0b100010] = {opcode_kind_RegisterMemoryToFromRegister,"mov"},
     [0b110001] = {opcode_kind_ImmediateToRegisterMemory,"mov"},
@@ -214,6 +236,30 @@ static s16 GetImmediate(buffer *OpcodeBuffer, s32 Offset, s32 IsWord)
     return Immediate;
 }
 
+static s32 WriteRegister(register_name RegisterName, s16 Value)
+{
+    s32 RegisterIndex = RegisterIndexTable[RegisterName];
+    switch(RegisterName)
+    {
+    case AX: case BX: case CX: case DX:
+    case SP: case BP: case SI: case DI:
+    {
+        GlobalRegisters[RegisterIndex] = Value;
+    } break;
+    case AH: case BH: case CH: case DH:
+    {
+        GlobalRegisters[RegisterIndex] = (0xff00 & Value) | (0xff & GlobalRegisters[RegisterIndex]);
+    } break;
+    case AL: case BL: case CL: case DL:
+    {
+        GlobalRegisters[RegisterIndex] = (0xff & Value) | (0xff00 & GlobalRegisters[RegisterIndex]);
+    } break;
+    case UNKNOWN_REGISTER: default:
+        return ErrorMessageAndCode("Write to unknown register\n", 1);
+    }
+    return 0;
+}
+
 static char *GetOpcodeNameForArithmeticImmediateFromRegisterMemory(s16 REG)
 {
     switch(REG)
@@ -227,19 +273,19 @@ static char *GetOpcodeNameForArithmeticImmediateFromRegisterMemory(s16 REG)
     }
 }
 
-static void InitSimulation(simulation_mode Mode)
+static s32 InitSimulation(simulation_mode Mode)
 {
     switch(Mode)
     {
         case simulation_mode_Print:
             printf("bits 16\n");
-            break;
     default:
         break;
     }
+    return 0;
 }
 
-static void SimulateRegisterToRegister(simulation_mode Mode, char *OpcodeName, s16 DestinationRegister, s16 SourceRegister)
+static s32 SimulateRegisterToRegister(simulation_mode Mode, char *OpcodeName, s16 DestinationRegister, s16 SourceRegister)
 {
     switch(Mode)
     {
@@ -247,11 +293,12 @@ static void SimulateRegisterToRegister(simulation_mode Mode, char *OpcodeName, s
         printf("%s %s, %s\n", OpcodeName, DisplayRegisterName(DestinationRegister), DisplayRegisterName(SourceRegister));
         break;
     default:
-        break;
+        return ErrorMessageAndCode("SimulateRegisterToRegister not implemented!\n", 1);
     }
+    return 0;
 }
 
-static void SimulateRegisterAndEffectiveAddressWithOffset(simulation_mode Mode, char *OpcodeName, s16 DestinationRegister, effective_address EffectiveAddress, s16 Offset, s16 D)
+static s32 SimulateRegisterAndEffectiveAddressWithOffset(simulation_mode Mode, char *OpcodeName, s16 DestinationRegister, effective_address EffectiveAddress, s16 Offset, s16 D)
 {
     switch(Mode)
     {
@@ -268,11 +315,12 @@ static void SimulateRegisterAndEffectiveAddressWithOffset(simulation_mode Mode, 
         }
     } break;
     default:
-        break;
+        return ErrorMessageAndCode("SimulateRegisterAndEffectiveAddressWithOffset not implemented!\n", 1);
     }
+    return 0;
 }
 
-static void SimulateRegisterAndEffectiveAddress(simulation_mode Mode, char *OpcodeName,
+static s32 SimulateRegisterAndEffectiveAddress(simulation_mode Mode, char *OpcodeName,
                                                 s16 DestinationRegister, effective_address EffectiveAddress,
                                                 s16 D, s32 IsDirectAddress, s16 Immediate)
 {
@@ -297,11 +345,12 @@ static void SimulateRegisterAndEffectiveAddress(simulation_mode Mode, char *Opco
         }
     } break;
     default:
-        break;
+        return ErrorMessageAndCode("SimulateRegisterAndEffectiveAddress not implemented!\n", 1);
     }
+    return 0;
 }
 
-static void SimulateImmediateToRegisterMemory(simulation_mode Mode, char *OpcodeName,
+static s32 SimulateImmediateToRegisterMemory(simulation_mode Mode, char *OpcodeName,
                                         s16 DestinationRegister, char *ImmediateSizeName,
                                         s16 Immediate, s32 IsMove)
 {
@@ -318,11 +367,12 @@ static void SimulateImmediateToRegisterMemory(simulation_mode Mode, char *Opcode
         }
         break;
     default:
-        break;
+        return ErrorMessageAndCode("SimulateImmediateToRegisterMemory not implemented!\n", 1);
     }
+    return 0;
 }
 
-static void SimulateImmediateToEffectiveAddressWithOffset(simulation_mode Mode, char *OpcodeName,
+static s32 SimulateImmediateToEffectiveAddressWithOffset(simulation_mode Mode, char *OpcodeName,
                                         effective_address EffectiveAddress, char *ImmediateSizeName,
                                         s16 Immediate, s16 Displacement, s32 IsMove)
 {
@@ -341,13 +391,14 @@ static void SimulateImmediateToEffectiveAddressWithOffset(simulation_mode Mode, 
         }
     } break;
     default:
-        break;
+        return ErrorMessageAndCode("SimulateImmediateToEffectiveAddressWithOffset not implemented!\n", 1);
     }
+    return 0;
 }
 
-static void SimulateImmediateToEffectiveAddress(simulation_mode Mode, char *OpcodeName,
-                                                effective_address EffectiveAddress, char *ImmediateSizeName,
-                                                s16 Immediate, s32 IsMove, s32 IsDirectAddress, s16 DirectAddress)
+static s32 SimulateImmediateToEffectiveAddress(simulation_mode Mode, char *OpcodeName,
+                                               effective_address EffectiveAddress, char *ImmediateSizeName,
+                                               s16 Immediate, s32 IsMove, s32 IsDirectAddress, s16 DirectAddress)
 {
     char *EffectiveAddressDisplay = GetEffectiveAddressDisplay(EffectiveAddress);
     char DirectAddressDisplay[64];
@@ -370,11 +421,12 @@ static void SimulateImmediateToEffectiveAddress(simulation_mode Mode, char *Opco
         }
     } break;
     default:
-        break;
+        return ErrorMessageAndCode("SimulateImmediateToEffectiveAddress not implemented!\n", 1);
     }
+    return 0;
 }
 
-static void SimulateImmediateToRegister(simulation_mode Mode, char *OpcodeName, s16 DestinationRegister, s16 Immediate)
+static s32 SimulateImmediateToRegister(simulation_mode Mode, char *OpcodeName, s16 DestinationRegister, s16 Immediate)
 {
     switch(Mode)
     {
@@ -383,11 +435,12 @@ static void SimulateImmediateToRegister(simulation_mode Mode, char *OpcodeName, 
         printf("%s %s, %d\n", OpcodeName, DisplayRegisterName(DestinationRegister), Immediate);
     } break;
     default:
-        break;
+        return WriteRegister(DestinationRegister, Immediate);
     }
+    return 0;
 }
 
-static void SimulateMemoryAccumulator(simulation_mode Mode, char *OpcodeName, s16 Immediate, s16 D, s32 IsMove, s32 IsWideData)
+static s32 SimulateMemoryAccumulator(simulation_mode Mode, char *OpcodeName, s16 Immediate, s16 D, s32 IsMove, s32 IsWideData)
 {
     switch(Mode)
     {
@@ -406,11 +459,12 @@ static void SimulateMemoryAccumulator(simulation_mode Mode, char *OpcodeName, s1
         }
     } break;
     default:
-        break;
+        return ErrorMessageAndCode("SimulateMemoryAccumulator not implemented!\n", 1);
     }
+    return 0;
 }
 
-static void SimulateJump(simulation_mode Mode, char *JumpInstructionName, s32 InstructionOffset)
+static s32 SimulateJump(simulation_mode Mode, char *JumpInstructionName, s32 InstructionOffset)
 {
     switch(Mode)
     {
@@ -419,22 +473,35 @@ static void SimulateJump(simulation_mode Mode, char *JumpInstructionName, s32 In
         printf("%s $+2+%d\n", JumpInstructionName, InstructionOffset);
     } break;
     default:
-        break;
+        return ErrorMessageAndCode("SimulateJump not implemented!\n", 1);
     }
+    return 0;
 }
 
+static void DEBUG_PrintGlobalRegisters()
+{
+    s32 I;
+    printf("             AX   BX   CX   DX   SP   BP   SI   DI\n");
+    printf("Registers [ ");
+    for (I = 0; I < REGISTER_COUNT; ++I)
+    {
+        printf("%0004x ", GlobalRegisters[I]);
+    }
+    printf("]\n\n");
+}
 
 static s32 SimulateBuffer(buffer *OpcodeBuffer, simulation_mode Mode)
 {
     s32 Result = 0;
-    InitSimulation(Mode);
-    while(1)
+    if (InitSimulation(Mode)) return ErrorMessageAndCode("Error initializing simulation\n", 1);
+    while(Result == 0)
     {
         if(OpcodeBuffer->Index >= OpcodeBuffer->Size)
         {
             /* TODO: there should be an error here sometimes. Like if there is a lone byte at the end of the instruction stream */
             break;
         }
+        DEBUG_PrintGlobalRegisters();
         u8 FirstByte = OpcodeBuffer->Data[OpcodeBuffer->Index];
         u8 OpcodeValue = GET_OPCODE(FirstByte);
         opcode Opcode = OpcodeTable[OpcodeValue];
@@ -460,7 +527,7 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer, simulation_mode Mode)
                 s16 SourceIndex      = D ? RM  : REG;
                 s16 DestinationRegister = RegTable[DestinationIndex][W];
                 s16 SourceRegister      = RegTable[SourceIndex     ][W];
-                SimulateRegisterToRegister(Mode, OpcodeName, DestinationRegister, SourceRegister);
+                Result = SimulateRegisterToRegister(Mode, OpcodeName, DestinationRegister, SourceRegister);
             }
             else
             {
@@ -475,7 +542,7 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer, simulation_mode Mode)
                     }
                     InstructionLength = MOD == 0b10 ? 4 : 3;
                     s16 Immediate = GetImmediate(OpcodeBuffer, 2, MOD == 0b10);
-                    SimulateRegisterAndEffectiveAddressWithOffset(Mode, OpcodeName, DestinationRegister, EffectiveAddress, Immediate, D);
+                    Result = SimulateRegisterAndEffectiveAddressWithOffset(Mode, OpcodeName, DestinationRegister, EffectiveAddress, Immediate, D);
                 }
                 else
                 {
@@ -491,7 +558,7 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer, simulation_mode Mode)
                         Immediate = GetImmediate(OpcodeBuffer, 2, 1);
                         InstructionLength = 4;
                     }
-                    SimulateRegisterAndEffectiveAddress(Mode, OpcodeName, DestinationRegister, EffectiveAddress, D, IsDirectAddress, Immediate);
+                    Result = SimulateRegisterAndEffectiveAddress(Mode, OpcodeName, DestinationRegister, EffectiveAddress, D, IsDirectAddress, Immediate);
                 }
             }
         } break;
@@ -499,7 +566,7 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer, simulation_mode Mode)
         {
             if (OpcodeBuffer->Index + 1 > OpcodeBuffer->Size)
             {
-                return ErrorMessageAndCode("Unexpected end-of-stream while parsing opcode_kind_ImmediateToRegisterMemory", 1);
+                return ErrorMessageAndCode("Unexpected end-of-stream while parsing opcode_kind_ImmediateToRegisterMemory\n", 1);
             }
             u8 SecondByte = OpcodeBuffer->Data[OpcodeBuffer->Index + 1];
             s32 IsMove = OpcodeValue == MOV_IMMEDIATE_TO_REGISTER_MEMORY;
@@ -518,12 +585,12 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer, simulation_mode Mode)
                 s32 NeededByteCount = IsWideData ? 3 : 2;
                 if (OpcodeBuffer->Index + NeededByteCount > OpcodeBuffer->Size)
                 {
-                    return ErrorMessageAndCode("Unexpected end-of-stream while parsing opcode_kind_ImmediateToRegisterMemory", 1);
+                    return ErrorMessageAndCode("Unexpected end-of-stream while parsing opcode_kind_ImmediateToRegisterMemory\n", 1);
                 }
                 InstructionLength = IsWideData ? 4 : 3;
                 s16 Immediate = GetImmediate(OpcodeBuffer, 2, IsWideData);
                 s16 DestinationRegister = RegTable[RM][W];
-                SimulateImmediateToRegisterMemory(Mode, OpcodeName, DestinationRegister, ImmediateSizeName, Immediate, IsMove);
+                Result = SimulateImmediateToRegisterMemory(Mode, OpcodeName, DestinationRegister, ImmediateSizeName, Immediate, IsMove);
             }
             else
             {
@@ -547,7 +614,7 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer, simulation_mode Mode)
                         return ErrorMessageAndCode("opcode_kind_ImmediateToRegisterMemory unexpected end of buffer\n", 1);
                     }
                     s16 Immediate = GetImmediate(OpcodeBuffer, ImmediateOffset, IsWideData);
-                    SimulateImmediateToEffectiveAddressWithOffset(Mode, OpcodeName, EffectiveAddress, ImmediateSizeName, Immediate, Displacement, IsMove);
+                    Result = SimulateImmediateToEffectiveAddressWithOffset(Mode, OpcodeName, EffectiveAddress, ImmediateSizeName, Immediate, Displacement, IsMove);
                 }
                 else
                 {
@@ -563,7 +630,7 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer, simulation_mode Mode)
                         Immediate = GetImmediate(OpcodeBuffer, 4, IsWideData);
                         InstructionLength = IsWideData ? 6 : 5;
                     }
-                    SimulateImmediateToEffectiveAddress(Mode, OpcodeName, EffectiveAddress, ImmediateSizeName, Immediate, IsMove, IsDirectAddress, DirectAddress);
+                    Result = SimulateImmediateToEffectiveAddress(Mode, OpcodeName, EffectiveAddress, ImmediateSizeName, Immediate, IsMove, IsDirectAddress, DirectAddress);
                 }
             }
         } break;
@@ -579,7 +646,7 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer, simulation_mode Mode)
             }
             s16 Immediate = GetImmediate(OpcodeBuffer, 1, W);
             InstructionLength = W ? 3 : 2;
-            SimulateImmediateToRegister(Mode, OpcodeName, DestinationRegister, Immediate);
+            Result = SimulateImmediateToRegister(Mode, OpcodeName, DestinationRegister, Immediate);
         } break;
         case opcode_kind_MemoryAccumulator:
         {
@@ -591,7 +658,7 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer, simulation_mode Mode)
             s32 IsWideData = IsMove || W;
             InstructionLength = IsWideData ? 3 : 2;
             s16 Immediate = GetImmediate(OpcodeBuffer, 1, IsWideData);
-            SimulateMemoryAccumulator(Mode, OpcodeName, Immediate, D, IsMove, IsWideData);
+            Result = SimulateMemoryAccumulator(Mode, OpcodeName, Immediate, D, IsMove, IsWideData);
         } break;
         case opcode_kind_SegmentRegister:
             return ErrorMessageAndCode("opcode_kind_SegmentRegister not implemented\n", -1);
@@ -602,7 +669,7 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer, simulation_mode Mode)
             char *JumpInstructionName = JumpInstructionNameTable[FirstByte];
             s32 InstructionOffset = GetImmediate(OpcodeBuffer, 1, 0);
             InstructionLength = 2;
-            SimulateJump(Mode, JumpInstructionName, InstructionOffset);
+            Result = SimulateJump(Mode, JumpInstructionName, InstructionOffset);
         } break;
         default:
             printf("FirstByte"); DEBUG_PrintByteInBinary(FirstByte); printf("\n");
@@ -610,18 +677,19 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer, simulation_mode Mode)
         }
         OpcodeBuffer->Index += InstructionLength;
     }
-    printf("\n");
+    DEBUG_PrintGlobalRegisters();
     return Result;
 }
 
 static s32 TestSim(void)
 {
     s32 I, SimResult = 0;
-    simulation_mode Mode = simulation_mode_Print;
+    simulation_mode Mode = simulation_mode_Simulate;
     char *FilePaths[] = {
         /* "../assets/listing_0039_more_movs", */
         /* "../assets/listing_0040_challenge_movs", */
-        "../assets/listing_0041_add_sub_cmp_jnz"
+        /* "../assets/listing_0041_add_sub_cmp_jnz", */
+        "../assets/listing_0043_immediate_movs",
         /* "../assets/test" */
     };
 

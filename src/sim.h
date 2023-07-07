@@ -32,11 +32,11 @@ typedef struct
 typedef enum
 {
     UNKNOWN_REGISTER,
-    AH, AL, AX,
-    BH, BL, BP, BX,
-    CH, CL, CX,
-    DH, DI, DL, DX,
-    SI, SP,
+    AX, AH, AL,
+    BX, BH, BL,
+    CX, CH, CL,
+    DX, DH, DL,
+    SP, BP, SI, DI,
 } register_name;
 
 typedef enum
