@@ -13,6 +13,8 @@ typedef size_t size;
 
 #define ARRAY_COUNT(a) ((s32)(sizeof(a) / sizeof((a)[0])))
 
+#define SET_FLAG(flags, flag, bool) ((((flag) * ((bool) ? 1 : 0)) & -1) | flags)
+
 typedef enum
 {
    opcode_kind_None,
@@ -53,6 +55,32 @@ typedef enum
     SP, BP, SI, DI,
     CS, DS, SS, ES,
 } register_name;
+
+typedef enum
+{
+    // Status Flags
+    ///////////////
+    // DOCS: If CF (flag_Carry) is set, there has been a carry out of, or a borrow into, the high-order but of the result (8- or 16-bit quantity). This flag is used by decimal arithmetic instructions.
+    flag_Carry = 0x1,
+    // DOCS: If PF (flag_Parity) is set, the result has even parity, an even number of 1-buts. This flag can be used to check for data transmission errors.
+    flag_Parity = 0x2,
+    // DOCS: If AF (flag_Aux_Carry) is set, there has been a carry out of the low-nibble into the high-nibble or a borrow from the high-nibble into the low-nibble of an 8-bit quantity (low-order byte of a 16-bit quantity). This flag is used by decimal arithmetic instructions.
+    flag_Aux_Carry = 0x4,
+    // DOCS: If ZF (flag_Zero) is set, the result of the operation is 0.
+    flag_Zero = 0x8,
+    // DOCS: If SF (flag_Sign) is set, the high-order bit of the result is a 1. Since negative binary numbers are represented in the 8086 and 8088 in standard two's complement notation, SF indicates the sign of the result (0 = positive, 1 = negative).
+    flag_Sign = 0x10,
+    // DOCS: If OF (flag_Overflow) is set, an arithmetic overflow has occured; that is, a significant digit has been lost because the size of the result exceeded capacity of its destination location. An Interrupt On Overflow instruction is availble that will generate an interrupt in this situation.
+    flag_Overflow = 0x20,
+    // Control Flags
+    ////////////////
+    // DOCS: Setting IF (flag_Interrupt) allows the CPU to recognize external (maskable) interrupt requests. Clearing IF disables these interrupts. IF has no affect on either non-maskable external or internally generated interrupts.
+    flag_Interrupt = 0x40,
+    // DOCS: Setting DF (flag_Direction) causes string instructions to auto-decrement; that is, to process strings from high addresses to low addresses, or from "right to left." Clearing DF causes string instructions to auto-increment, or to process string from "left to right."
+    flag_Direction = 0x80,
+    // DOCS: Settings TF (flag_Trap) puts the processor into single-step mode for debugging. In this mode, CPU automatically generates an internal interrupt after each instruction, allowing a program to be inspected as it executes instruction-by-instruction.
+    flag_Trap = 0x100,
+} flag;
 
 typedef enum
 {

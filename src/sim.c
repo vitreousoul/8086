@@ -68,6 +68,8 @@
 
 #define REGISTER_COUNT 12
 u16 GlobalRegisters[REGISTER_COUNT] = {};
+#define FLAG_COUNT 9
+u16 GlobalFlags = 0;
 
 s32 RegisterIndexTable[32] = {
     [AX] = 0, [AH] = 0, [AL] = 0,
@@ -265,6 +267,17 @@ static s32 ReadRegister(register_name RegisterName)
     return 0;
 }
 
+static void UpdateFlags(s16 ResultValue)
+{
+    printf("flag_Zero %x\n", ResultValue == 0);
+    printf("flag_Sign %x\n", ResultValue & 0x80);
+    printf("GlobalFlags %x\n", GlobalFlags);
+    GlobalFlags = SET_FLAG(GlobalFlags, flag_Zero, ResultValue == 0);
+    printf("GlobalFlags %x\n", GlobalFlags);
+    GlobalFlags = SET_FLAG(GlobalFlags, flag_Sign, ResultValue & 0x80);
+    printf("GlobalFlags %x\n", GlobalFlags);
+}
+
 static s32 WriteRegister(register_name RegisterName, s16 Value)
 {
     printf("WriteRegister %d %d\n", RegisterName, Value);
@@ -288,6 +301,7 @@ static s32 WriteRegister(register_name RegisterName, s16 Value)
     case UNKNOWN_REGISTER: default:
         return ErrorMessageAndCode("Write to unknown register\n", 1);
     }
+    UpdateFlags(Value);
     return 0;
 }
 
@@ -564,14 +578,17 @@ static s32 SimulateJump(simulation_mode Mode, char *JumpInstructionName, s32 Ins
 
 static void DEBUG_PrintGlobalRegisters()
 {
+    char *NameMap[] = {"AX", "BX", "CX", "DX", "SP", "BP", "SI", "DI", "CS", "DS", "SS", "ES"};
     s32 I;
-    printf("             AX   BX   CX   DX   SP   BP   SI   DI   CS   DS   SS   ES\n");
-    printf("Registers [ ");
+    printf("Registers:\n");
     for (I = 0; I < REGISTER_COUNT; ++I)
     {
-        printf("%0004x ", GlobalRegisters[I]);
+        printf("  %s %0004x \n", NameMap[I], GlobalRegisters[I]);
     }
-    printf("]\n\n");
+    printf("\nFlags:           DIOSZAPC\n      ");
+    DEBUG_PrintByteInBinary(0xff & (GlobalFlags >> 8));
+    DEBUG_PrintByteInBinary(0xff & GlobalFlags);
+    printf("\n");
 }
 
 static s32 SimulateBuffer(buffer *OpcodeBuffer, simulation_mode Mode)
