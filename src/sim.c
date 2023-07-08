@@ -119,6 +119,13 @@ s32 RegTable[REG_COUNT][W_COUNT] = {
     [0b111] = {BH,DI},
 };
 
+s32 SegmentRegisterTable[4] = {
+    [0b00] = ES,
+    [0b01] = CS,
+    [0b10] = SS,
+    [0b11] = DS,
+};
+
 s32 EffectiveAddressCalculationTable[MOD_COUNT][RM_COUNT] = {
     [0b00] = {
         eac_BX_SI,
@@ -228,6 +235,11 @@ static s16 GetImmediate(buffer *OpcodeBuffer, s32 Offset, s32 IsWord)
     }
 }
 
+static s32 GetRegisterIndex(s32 RegOrRM, s32 IsWide, s32 IsSegment)
+{
+    return IsSegment ? SegmentRegisterTable[(RegOrRM & 0b11)] : RegTable[RegOrRM][IsWide];
+}
+
 static s32 ReadRegister(register_name RegisterName)
 {
     s32 RegisterIndex = RegisterIndexTable[RegisterName];
@@ -235,6 +247,7 @@ static s32 ReadRegister(register_name RegisterName)
     {
     case AX: case BX: case CX: case DX:
     case SP: case BP: case SI: case DI:
+    case CS: case DS: case SS: case ES:
     {
         return GlobalRegisters[RegisterIndex];
     } break;
@@ -259,12 +272,13 @@ static s32 WriteRegister(register_name RegisterName, s16 Value)
     {
     case AX: case BX: case CX: case DX:
     case SP: case BP: case SI: case DI:
+    case CS: case DS: case SS: case ES:
     {
         GlobalRegisters[RegisterIndex] = Value;
     } break;
     case AH: case BH: case CH: case DH:
     {
-        GlobalRegisters[RegisterIndex] = (0xff00 & Value) | (0xff & GlobalRegisters[RegisterIndex]);
+        GlobalRegisters[RegisterIndex] = ((0xff & Value) << 8) | (0xff & GlobalRegisters[RegisterIndex]);
     } break;
     case AL: case BL: case CL: case DL:
     {
@@ -494,7 +508,7 @@ static s32 SimulateJump(simulation_mode Mode, char *JumpInstructionName, s32 Ins
 static void DEBUG_PrintGlobalRegisters()
 {
     s32 I;
-    printf("             AX   BX   CX   DX   SP   BP   SI   DI\n");
+    printf("             AX   BX   CX   DX   SP   BP   SI   DI   CS   DS   SS   ES\n");
     printf("Registers [ ");
     for (I = 0; I < REGISTER_COUNT; ++I)
     {
@@ -514,7 +528,7 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer, simulation_mode Mode)
             /* TODO: there should be an error here sometimes. Like if there is a lone byte at the end of the instruction stream */
             break;
         }
-        DEBUG_PrintGlobalRegisters();
+        if (Mode != simulation_mode_Print) DEBUG_PrintGlobalRegisters();
         u8 FirstByte = OpcodeBuffer->Data[OpcodeBuffer->Index];
         u8 OpcodeValue = GET_OPCODE(FirstByte);
         opcode Opcode = OpcodeTable[OpcodeValue];
@@ -524,8 +538,10 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer, simulation_mode Mode)
         s32 InstructionLength = 2; /* we just guess that InstructionLength is 2 and update it in places where it is not */
         switch(Opcode.Kind)
         {
+        case opcode_kind_SegmentRegister:
         case opcode_kind_RegisterMemoryToFromRegister:
         {
+            s32 IsSegment = Opcode.Kind == opcode_kind_SegmentRegister;
             if (OpcodeBuffer->Index + 1 >= OpcodeBuffer->Size)
             {
                 return ErrorMessageAndCode("opcode_kind_RegisterMemoryToFromRegister unexpected end of buffer\n", 1);
@@ -536,15 +552,16 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer, simulation_mode Mode)
             s16 RM = GET_RM(SecondByte);
             if(MOD == 0b11)
             {
-                s16 DestinationIndex = D ? REG : RM;
-                s16 SourceIndex      = D ? RM  : REG;
-                s16 DestinationRegister = RegTable[DestinationIndex][W];
-                s16 SourceRegister      = RegTable[SourceIndex     ][W];
+                s16 RegIndex = IsSegment ? SegmentRegisterTable[(REG & 0b11)] : RegTable[REG][W];
+                s32 RmIsWide = IsSegment || W;
+                s16 RmIndex = RegTable[RM][RmIsWide];
+                s16 DestinationRegister = D ? RegIndex : RmIndex;
+                s16 SourceRegister      = D ? RmIndex  : RegIndex;
                 Result = SimulateRegisterToRegister(Mode, OpcodeName, DestinationRegister, SourceRegister);
             }
             else
             {
-                s16 DestinationRegister = RegTable[REG][W];
+                s16 DestinationRegister = GetRegisterIndex(REG, W, IsSegment);
                 effective_address EffectiveAddress = EffectiveAddressCalculationTable[MOD][RM];
                 if (MOD == 0b01 || MOD == 0b10)
                 {
@@ -673,8 +690,6 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer, simulation_mode Mode)
             s16 Immediate = GetImmediate(OpcodeBuffer, 1, IsWideData);
             Result = SimulateMemoryAccumulator(Mode, OpcodeName, Immediate, D, IsMove, IsWideData);
         } break;
-        case opcode_kind_SegmentRegister:
-            return ErrorMessageAndCode("opcode_kind_SegmentRegister not implemented\n", -1);
         case opcode_kind_RegisterToRegisterMemory:
             return ErrorMessageAndCode("opcode_kind_RegisterToRegisterMemory not implemented\n", -1);
         case opcode_kind_Jump:
@@ -690,7 +705,7 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer, simulation_mode Mode)
         }
         OpcodeBuffer->Index += InstructionLength;
     }
-    DEBUG_PrintGlobalRegisters();
+    if (Mode != simulation_mode_Print) DEBUG_PrintGlobalRegisters();
     return Result;
 }
 

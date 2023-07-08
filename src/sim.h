@@ -111,6 +111,10 @@ static char *DisplayRegisterName(register_name Name)
     case DX: return "DX";
     case SI: return "SI";
     case SP: return "SP";
+    case CS: return "CS";
+    case DS: return "DS";
+    case SS: return "SS";
+    case ES: return "ES";
     default:
     case UNKNOWN_REGISTER: return "UNKNOWN_REGISTER";
     }
