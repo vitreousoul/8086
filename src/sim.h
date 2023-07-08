@@ -25,10 +25,22 @@ typedef enum
    opcode_kind_Jump,
 } opcode_kind;
 
+typedef enum
+{
+    instruction_kind_NONE,
+    instruction_kind_Derived,
+    instruction_kind_Mov,
+    instruction_kind_Add,
+    instruction_kind_Adc,
+    instruction_kind_Sub,
+    instruction_kind_Sbb,
+    instruction_kind_Cmp,
+} instruction_kind;
+
 typedef struct
 {
     opcode_kind Kind;
-    char *Name;
+    instruction_kind InstructionKind;
 } opcode;
 
 typedef enum
@@ -117,6 +129,21 @@ static char *DisplayRegisterName(register_name Name)
     case ES: return "ES";
     default:
     case UNKNOWN_REGISTER: return "UNKNOWN_REGISTER";
+    }
+}
+
+static char *DisplayInstructionKind(instruction_kind Kind)
+{
+    switch(Kind)
+    {
+    case instruction_kind_Mov: return "mov";
+    case instruction_kind_Add: return "add";
+    case instruction_kind_Adc: return "adc";
+    case instruction_kind_Sub: return "sub";
+    case instruction_kind_Sbb: return "sbb";
+    case instruction_kind_Cmp: return "cmp";
+
+    default: return "UNKNOWN INSTRUCTION KIND";
     }
 }
 

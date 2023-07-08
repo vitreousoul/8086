@@ -79,26 +79,26 @@ s32 RegisterIndexTable[32] = {
 };
 
 opcode OpcodeTable[OPCODE_COUNT] = {
-    [0b100010] = {opcode_kind_RegisterMemoryToFromRegister,"mov"},
-    [0b110001] = {opcode_kind_ImmediateToRegisterMemory,"mov"},
-    [0b101100] = {opcode_kind_ImmediateToRegister,"mov"},
-    [0b101101] = {opcode_kind_ImmediateToRegister,"mov"},
-    [0b101110] = {opcode_kind_ImmediateToRegister,"mov"},
-    [0b101111] = {opcode_kind_ImmediateToRegister,"mov"},
-    [0b101000] = {opcode_kind_MemoryAccumulator,"mov"},
-    [0b100011] = {opcode_kind_SegmentRegister,"mov"},
-    [0b000000] = {opcode_kind_RegisterMemoryToFromRegister,"add"},
-    [0b000001] = {opcode_kind_MemoryAccumulator,"add"},
-    [0b001010] = {opcode_kind_RegisterMemoryToFromRegister,"sub"},
-    [0b001011] = {opcode_kind_MemoryAccumulator,"sub"},
-    [0b001110] = {opcode_kind_RegisterMemoryToFromRegister,"cmp"},
-    [0b001111] = {opcode_kind_MemoryAccumulator,"cmp"},
-    [0b100000] = {opcode_kind_ImmediateToRegisterMemory,"OPCODE_NAME_DERIVED_FROM_REG"},
-    [0b011101] = {opcode_kind_Jump,"DERIVED_OPCODE_NAME"},
-    [0b011111] = {opcode_kind_Jump,"DERIVED_OPCODE_NAME"},
-    [0b011100] = {opcode_kind_Jump,"DERIVED_OPCODE_NAME"},
-    [0b011110] = {opcode_kind_Jump,"DERIVED_OPCODE_NAME"},
-    [0b111000] = {opcode_kind_Jump,"DERIVED_OPCODE_NAME"},
+    [0b100010] = {opcode_kind_RegisterMemoryToFromRegister,instruction_kind_Mov},
+    [0b110001] = {opcode_kind_ImmediateToRegisterMemory,instruction_kind_Mov},
+    [0b101100] = {opcode_kind_ImmediateToRegister,instruction_kind_Mov},
+    [0b101101] = {opcode_kind_ImmediateToRegister,instruction_kind_Mov},
+    [0b101110] = {opcode_kind_ImmediateToRegister,instruction_kind_Mov},
+    [0b101111] = {opcode_kind_ImmediateToRegister,instruction_kind_Mov},
+    [0b101000] = {opcode_kind_MemoryAccumulator,instruction_kind_Mov},
+    [0b100011] = {opcode_kind_SegmentRegister,instruction_kind_Mov},
+    [0b000000] = {opcode_kind_RegisterMemoryToFromRegister,instruction_kind_Add},
+    [0b000001] = {opcode_kind_MemoryAccumulator,instruction_kind_Add},
+    [0b001010] = {opcode_kind_RegisterMemoryToFromRegister,instruction_kind_Sub},
+    [0b001011] = {opcode_kind_MemoryAccumulator,instruction_kind_Sub},
+    [0b001110] = {opcode_kind_RegisterMemoryToFromRegister,instruction_kind_Cmp},
+    [0b001111] = {opcode_kind_MemoryAccumulator,instruction_kind_Cmp},
+    [0b100000] = {opcode_kind_ImmediateToRegisterMemory,instruction_kind_Derived},
+    [0b011101] = {opcode_kind_Jump,instruction_kind_Derived},
+    [0b011111] = {opcode_kind_Jump,instruction_kind_Derived},
+    [0b011100] = {opcode_kind_Jump,instruction_kind_Derived},
+    [0b011110] = {opcode_kind_Jump,instruction_kind_Derived},
+    [0b111000] = {opcode_kind_Jump,instruction_kind_Derived},
 };
 
 s32 ModTable[MOD_COUNT] = {
@@ -267,6 +267,7 @@ static s32 ReadRegister(register_name RegisterName)
 
 static s32 WriteRegister(register_name RegisterName, s16 Value)
 {
+    printf("WriteRegister %d %d\n", RegisterName, Value);
     s32 RegisterIndex = RegisterIndexTable[RegisterName];
     switch(RegisterName)
     {
@@ -290,16 +291,16 @@ static s32 WriteRegister(register_name RegisterName, s16 Value)
     return 0;
 }
 
-static char *GetOpcodeNameForArithmeticImmediateFromRegisterMemory(s16 REG)
+static instruction_kind GetInstructionKindForArithmeticImmediateFromRegisterMemory(s16 REG)
 {
     switch(REG)
     {
-    case 0b000: return "add";
-    case 0b010: return "adc";
-    case 0b101: return "sub";
-    case 0b011: return "sbb";
-    case 0b111: return "cmp";
-    default: return "INVALID";
+    case 0b000: return instruction_kind_Add;
+    case 0b010: return instruction_kind_Adc;
+    case 0b101: return instruction_kind_Sub;
+    case 0b011: return instruction_kind_Sbb;
+    case 0b111: return instruction_kind_Cmp;
+    default: return instruction_kind_NONE;
     }
 }
 
@@ -315,15 +316,41 @@ static s32 InitSimulation(simulation_mode Mode)
     return 0;
 }
 
-static s32 SimulateRegisterToRegister(simulation_mode Mode, char *OpcodeName, s16 DestinationRegister, s16 SourceRegister)
+static s32 SimulateRegisterToRegister(simulation_mode Mode, opcode Opcode, s16 DestinationRegister, s16 SourceRegister)
 {
+    s16 DestinationRegisterValue = ReadRegister(DestinationRegister);
+    s16 ValueToWrite = ReadRegister(SourceRegister);
     switch(Mode)
     {
     case simulation_mode_Print:
-        printf("%s %s, %s\n", OpcodeName, DisplayRegisterName(DestinationRegister), DisplayRegisterName(SourceRegister));
+        printf("%s %s, %s\n", DisplayInstructionKind(Opcode.InstructionKind), DisplayRegisterName(DestinationRegister), DisplayRegisterName(SourceRegister));
         break;
     case simulation_mode_Simulate:
-        WriteRegister(DestinationRegister, ReadRegister(SourceRegister));
+        switch(Opcode.InstructionKind)
+        {
+        case instruction_kind_Add:
+        {
+            ValueToWrite = DestinationRegisterValue + ValueToWrite;
+        } break;
+        case instruction_kind_Adc:
+        {
+            ValueToWrite = DestinationRegisterValue + ValueToWrite;
+        } break;
+        case instruction_kind_Sub:
+        {
+            ValueToWrite = DestinationRegisterValue - ValueToWrite;
+        } break;
+        case instruction_kind_Sbb:
+        {
+            ValueToWrite = DestinationRegisterValue - ValueToWrite;
+        } break;
+        case instruction_kind_Cmp:
+        {
+            ValueToWrite = DestinationRegisterValue - ValueToWrite;
+        } break;
+        default: break;
+        }
+        WriteRegister(DestinationRegister, ValueToWrite);
         break;
     default:
         return ErrorMessageAndCode("SimulateRegisterToRegister unknown simulation_mode!\n", 1);
@@ -331,7 +358,7 @@ static s32 SimulateRegisterToRegister(simulation_mode Mode, char *OpcodeName, s1
     return 0;
 }
 
-static s32 SimulateRegisterAndEffectiveAddressWithOffset(simulation_mode Mode, char *OpcodeName, s16 DestinationRegister, effective_address EffectiveAddress, s16 Offset, s16 D)
+static s32 SimulateRegisterAndEffectiveAddressWithOffset(simulation_mode Mode, opcode Opcode, s16 DestinationRegister, effective_address EffectiveAddress, s16 Offset, s16 D)
 {
     switch(Mode)
     {
@@ -340,11 +367,11 @@ static s32 SimulateRegisterAndEffectiveAddressWithOffset(simulation_mode Mode, c
         char *EffectiveAddressDisplay = GetEffectiveAddressDisplay(EffectiveAddress);
         if (D)
         {
-            printf("%s %s, %s %d]\n", OpcodeName, DisplayRegisterName(DestinationRegister), EffectiveAddressDisplay, Offset);
+            printf("%s %s, %s %d]\n", DisplayInstructionKind(Opcode.InstructionKind), DisplayRegisterName(DestinationRegister), EffectiveAddressDisplay, Offset);
         }
         else
         {
-            printf("%s %s %d], %s\n", OpcodeName, EffectiveAddressDisplay, Offset, DisplayRegisterName(DestinationRegister));
+            printf("%s %s %d], %s\n", DisplayInstructionKind(Opcode.InstructionKind), EffectiveAddressDisplay, Offset, DisplayRegisterName(DestinationRegister));
         }
     } break;
     default:
@@ -353,7 +380,7 @@ static s32 SimulateRegisterAndEffectiveAddressWithOffset(simulation_mode Mode, c
     return 0;
 }
 
-static s32 SimulateRegisterAndEffectiveAddress(simulation_mode Mode, char *OpcodeName, s16 DestinationRegister, effective_address EffectiveAddress, s16 D, s32 IsDirectAddress, s16 Immediate)
+static s32 SimulateRegisterAndEffectiveAddress(simulation_mode Mode, opcode Opcode, s16 DestinationRegister, effective_address EffectiveAddress, s16 D, s32 IsDirectAddress, s16 Immediate)
 {
     char DirectAddressDisplay[64];
     char *EffectiveAddressDisplay = GetEffectiveAddressDisplay(EffectiveAddress);
@@ -368,11 +395,11 @@ static s32 SimulateRegisterAndEffectiveAddress(simulation_mode Mode, char *Opcod
     {
         if (D)
         {
-            printf("%s %s, %s\n", OpcodeName, DisplayRegisterName(DestinationRegister), EffectiveAddressDisplay);
+            printf("%s %s, %s\n", DisplayInstructionKind(Opcode.InstructionKind), DisplayRegisterName(DestinationRegister), EffectiveAddressDisplay);
         }
         else
         {
-            printf("%s %s, %s\n", OpcodeName, EffectiveAddressDisplay, DisplayRegisterName(DestinationRegister));
+            printf("%s %s, %s\n", DisplayInstructionKind(Opcode.InstructionKind), EffectiveAddressDisplay, DisplayRegisterName(DestinationRegister));
         }
     } break;
     default:
@@ -381,7 +408,7 @@ static s32 SimulateRegisterAndEffectiveAddress(simulation_mode Mode, char *Opcod
     return 0;
 }
 
-static s32 SimulateImmediateToRegisterMemory(simulation_mode Mode, char *OpcodeName, s16 DestinationRegister, char *ImmediateSizeName, s16 Immediate, s32 IsMove)
+static s32 SimulateImmediateToRegisterMemory(simulation_mode Mode, opcode Opcode, s16 DestinationRegister, char *ImmediateSizeName, s16 Immediate, s32 IsMove)
 {
     switch(Mode)
     {
@@ -390,20 +417,22 @@ static s32 SimulateImmediateToRegisterMemory(simulation_mode Mode, char *OpcodeN
         char *RegisterName = DisplayRegisterName(DestinationRegister);
         if (IsMove)
         {
-            printf("%s %s, %s %d\n", OpcodeName, RegisterName, ImmediateSizeName, Immediate);
+            printf("%s %s, %s %d\n", DisplayInstructionKind(Opcode.InstructionKind), RegisterName, ImmediateSizeName, Immediate);
         }
         else
         {
-            printf("%s %s %s, %d\n", OpcodeName, ImmediateSizeName, RegisterName, Immediate);
+            printf("%s %s %s, %d\n", DisplayInstructionKind(Opcode.InstructionKind), ImmediateSizeName, RegisterName, Immediate);
         }
     } break;
-    default:
+    case simulation_mode_Simulate:
         return ErrorMessageAndCode("SimulateImmediateToRegisterMemory not implemented!\n", 1);
+    default:
+        return ErrorMessageAndCode("SimulateImmediateToRegisterMemory unknown simulation mode\n", 1);
     }
     return 0;
 }
 
-static s32 SimulateImmediateToEffectiveAddressWithOffset(simulation_mode Mode, char *OpcodeName, effective_address EffectiveAddress, char *ImmediateSizeName, s16 Immediate, s16 Displacement, s32 IsMove)
+static s32 SimulateImmediateToEffectiveAddressWithOffset(simulation_mode Mode, opcode Opcode, effective_address EffectiveAddress, char *ImmediateSizeName, s16 Immediate, s16 Displacement, s32 IsMove)
 {
     char *EffectiveAddressDisplay = GetEffectiveAddressDisplay(EffectiveAddress);
     switch(Mode)
@@ -412,11 +441,11 @@ static s32 SimulateImmediateToEffectiveAddressWithOffset(simulation_mode Mode, c
     {
         if (IsMove)
         {
-            printf("%s %s %d], %s %d\n", OpcodeName, EffectiveAddressDisplay, Displacement, ImmediateSizeName, Immediate);
+            printf("%s %s %d], %s %d\n", DisplayInstructionKind(Opcode.InstructionKind), EffectiveAddressDisplay, Displacement, ImmediateSizeName, Immediate);
         }
         else
         {
-            printf("%s %s %s %d], %d\n", OpcodeName, ImmediateSizeName, EffectiveAddressDisplay, Displacement, Immediate);
+            printf("%s %s %s %d], %d\n", DisplayInstructionKind(Opcode.InstructionKind), ImmediateSizeName, EffectiveAddressDisplay, Displacement, Immediate);
         }
     } break;
     default:
@@ -425,7 +454,7 @@ static s32 SimulateImmediateToEffectiveAddressWithOffset(simulation_mode Mode, c
     return 0;
 }
 
-static s32 SimulateImmediateToEffectiveAddress(simulation_mode Mode, char *OpcodeName, effective_address EffectiveAddress, char *ImmediateSizeName, s16 Immediate, s32 IsMove, s32 IsDirectAddress, s16 DirectAddress)
+static s32 SimulateImmediateToEffectiveAddress(simulation_mode Mode, opcode Opcode, effective_address EffectiveAddress, char *ImmediateSizeName, s16 Immediate, s32 IsMove, s32 IsDirectAddress, s16 DirectAddress)
 {
     char *EffectiveAddressDisplay = GetEffectiveAddressDisplay(EffectiveAddress);
     char DirectAddressDisplay[64];
@@ -440,11 +469,11 @@ static s32 SimulateImmediateToEffectiveAddress(simulation_mode Mode, char *Opcod
     {
         if (IsMove)
         {
-            printf("%s %s, %s %d\n", OpcodeName, EffectiveAddressDisplay, ImmediateSizeName, Immediate);
+            printf("%s %s, %s %d\n", DisplayInstructionKind(Opcode.InstructionKind), EffectiveAddressDisplay, ImmediateSizeName, Immediate);
         }
         else
         {
-            printf("%s %s %s, %d\n", OpcodeName, ImmediateSizeName, EffectiveAddressDisplay, Immediate);
+            printf("%s %s %s, %d\n", DisplayInstructionKind(Opcode.InstructionKind), ImmediateSizeName, EffectiveAddressDisplay, Immediate);
         }
     } break;
     default:
@@ -453,21 +482,49 @@ static s32 SimulateImmediateToEffectiveAddress(simulation_mode Mode, char *Opcod
     return 0;
 }
 
-static s32 SimulateImmediateToRegister(simulation_mode Mode, char *OpcodeName, s16 DestinationRegister, s16 Immediate)
+static s32 SimulateImmediateToRegister(simulation_mode Mode, opcode Opcode, s16 DestinationRegister, s16 Immediate)
 {
+    s32 DestinationRegisterIndex = RegisterIndexTable[DestinationRegister];
+    s16 DestinationRegisterValue = GlobalRegisters[DestinationRegisterIndex];
     switch(Mode)
     {
     case simulation_mode_Print:
     {
-        printf("%s %s, %d\n", OpcodeName, DisplayRegisterName(DestinationRegister), Immediate);
+        printf("%s %s, %d\n", DisplayInstructionKind(Opcode.InstructionKind), DisplayRegisterName(DestinationRegister), Immediate);
     } break;
-    default:
+    case simulation_mode_Simulate:
+        switch(Opcode.InstructionKind)
+        {
+        case instruction_kind_Add:
+        {
+            Immediate = DestinationRegisterValue + Immediate;
+        } break;
+        case instruction_kind_Adc:
+        {
+            Immediate = DestinationRegisterValue + Immediate;
+        } break;
+        case instruction_kind_Sub:
+        {
+            Immediate = DestinationRegisterValue - Immediate;
+        } break;
+        case instruction_kind_Sbb:
+        {
+            Immediate = DestinationRegisterValue - Immediate;
+        } break;
+        case instruction_kind_Cmp:
+        {
+            Immediate = DestinationRegisterValue - Immediate;
+        } break;
+        default: break;
+        }
         return WriteRegister(DestinationRegister, Immediate);
+    default:
+        return ErrorMessageAndCode("SimulateImmediateToRegister unknown simulation mode\n", 1);
     }
     return 0;
 }
 
-static s32 SimulateMemoryAccumulator(simulation_mode Mode, char *OpcodeName, s16 Immediate, s16 D, s32 IsMove, s32 IsWideData)
+static s32 SimulateMemoryAccumulator(simulation_mode Mode, opcode Opcode, s16 Immediate, s16 D, s32 IsMove, s32 IsWideData)
 {
     switch(Mode)
     {
@@ -477,12 +534,12 @@ static s32 SimulateMemoryAccumulator(simulation_mode Mode, char *OpcodeName, s16
         if (D)
         {
             char *Format = IsMove ? "%s [%d], %s\n" : "%s %d, %s\n";
-            printf(Format, OpcodeName, Immediate, AccumulatorRegister);
+            printf(Format, DisplayInstructionKind(Opcode.InstructionKind), Immediate, AccumulatorRegister);
         }
         else
         {
             char *Format = IsMove ? "%s %s, [%d]\n" : "%s %s, %d\n";
-            printf(Format, OpcodeName, AccumulatorRegister, Immediate);
+            printf(Format, DisplayInstructionKind(Opcode.InstructionKind), AccumulatorRegister, Immediate);
         }
     } break;
     default:
@@ -532,7 +589,6 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer, simulation_mode Mode)
         u8 FirstByte = OpcodeBuffer->Data[OpcodeBuffer->Index];
         u8 OpcodeValue = GET_OPCODE(FirstByte);
         opcode Opcode = OpcodeTable[OpcodeValue];
-        char *OpcodeName = Opcode.Name;
         s16 D = GET_D(FirstByte);
         s16 W = GET_W(FirstByte);
         s32 InstructionLength = 2; /* we just guess that InstructionLength is 2 and update it in places where it is not */
@@ -557,7 +613,7 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer, simulation_mode Mode)
                 s16 RmIndex = RegTable[RM][RmIsWide];
                 s16 DestinationRegister = D ? RegIndex : RmIndex;
                 s16 SourceRegister      = D ? RmIndex  : RegIndex;
-                Result = SimulateRegisterToRegister(Mode, OpcodeName, DestinationRegister, SourceRegister);
+                Result = SimulateRegisterToRegister(Mode, Opcode, DestinationRegister, SourceRegister);
             }
             else
             {
@@ -572,7 +628,7 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer, simulation_mode Mode)
                     }
                     InstructionLength = MOD == 0b10 ? 4 : 3;
                     s16 Immediate = GetImmediate(OpcodeBuffer, 2, MOD == 0b10);
-                    Result = SimulateRegisterAndEffectiveAddressWithOffset(Mode, OpcodeName, DestinationRegister, EffectiveAddress, Immediate, D);
+                    Result = SimulateRegisterAndEffectiveAddressWithOffset(Mode, Opcode, DestinationRegister, EffectiveAddress, Immediate, D);
                 }
                 else
                 {
@@ -588,7 +644,7 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer, simulation_mode Mode)
                         Immediate = GetImmediate(OpcodeBuffer, 2, 1);
                         InstructionLength = 4;
                     }
-                    Result = SimulateRegisterAndEffectiveAddress(Mode, OpcodeName, DestinationRegister, EffectiveAddress, D, IsDirectAddress, Immediate);
+                    Result = SimulateRegisterAndEffectiveAddress(Mode, Opcode, DestinationRegister, EffectiveAddress, D, IsDirectAddress, Immediate);
                 }
             }
         } break;
@@ -608,7 +664,7 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer, simulation_mode Mode)
             s16 RM = GET_RM(SecondByte);
             if (OpcodeValue == 0b100000)
             {
-                OpcodeName = GetOpcodeNameForArithmeticImmediateFromRegisterMemory(REG);
+                Opcode.InstructionKind = GetInstructionKindForArithmeticImmediateFromRegisterMemory(REG);
             }
             if(MOD == 0b11)
             {
@@ -620,7 +676,7 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer, simulation_mode Mode)
                 InstructionLength = IsWideData ? 4 : 3;
                 s16 Immediate = GetImmediate(OpcodeBuffer, 2, IsWideData);
                 s16 DestinationRegister = RegTable[RM][W];
-                Result = SimulateImmediateToRegisterMemory(Mode, OpcodeName, DestinationRegister, ImmediateSizeName, Immediate, IsMove);
+                Result = SimulateImmediateToRegisterMemory(Mode, Opcode, DestinationRegister, ImmediateSizeName, Immediate, IsMove);
             }
             else
             {
@@ -644,7 +700,7 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer, simulation_mode Mode)
                         return ErrorMessageAndCode("opcode_kind_ImmediateToRegisterMemory unexpected end of buffer\n", 1);
                     }
                     s16 Immediate = GetImmediate(OpcodeBuffer, ImmediateOffset, IsWideData);
-                    Result = SimulateImmediateToEffectiveAddressWithOffset(Mode, OpcodeName, EffectiveAddress, ImmediateSizeName, Immediate, Displacement, IsMove);
+                    Result = SimulateImmediateToEffectiveAddressWithOffset(Mode, Opcode, EffectiveAddress, ImmediateSizeName, Immediate, Displacement, IsMove);
                 }
                 else
                 {
@@ -660,7 +716,7 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer, simulation_mode Mode)
                         Immediate = GetImmediate(OpcodeBuffer, 4, IsWideData);
                         InstructionLength = IsWideData ? 6 : 5;
                     }
-                    Result = SimulateImmediateToEffectiveAddress(Mode, OpcodeName, EffectiveAddress, ImmediateSizeName, Immediate, IsMove, IsDirectAddress, DirectAddress);
+                    Result = SimulateImmediateToEffectiveAddress(Mode, Opcode, EffectiveAddress, ImmediateSizeName, Immediate, IsMove, IsDirectAddress, DirectAddress);
                 }
             }
         } break;
@@ -676,7 +732,7 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer, simulation_mode Mode)
             }
             s16 Immediate = GetImmediate(OpcodeBuffer, 1, W);
             InstructionLength = W ? 3 : 2;
-            Result = SimulateImmediateToRegister(Mode, OpcodeName, DestinationRegister, Immediate);
+            Result = SimulateImmediateToRegister(Mode, Opcode, DestinationRegister, Immediate);
         } break;
         case opcode_kind_MemoryAccumulator:
         {
@@ -688,7 +744,7 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer, simulation_mode Mode)
             s32 IsWideData = IsMove || W;
             InstructionLength = IsWideData ? 3 : 2;
             s16 Immediate = GetImmediate(OpcodeBuffer, 1, IsWideData);
-            Result = SimulateMemoryAccumulator(Mode, OpcodeName, Immediate, D, IsMove, IsWideData);
+            Result = SimulateMemoryAccumulator(Mode, Opcode, Immediate, D, IsMove, IsWideData);
         } break;
         case opcode_kind_RegisterToRegisterMemory:
             return ErrorMessageAndCode("opcode_kind_RegisterToRegisterMemory not implemented\n", -1);
@@ -719,8 +775,8 @@ static s32 TestSim(void)
         /* "../assets/listing_0041_add_sub_cmp_jnz", */
         /* "../assets/listing_0043_immediate_movs", */
         /* "../assets/listing_0044_register_movs", */
-        "../assets/listing_0045_challenge_register_movs",
-        /* "../assets/test" */
+        /* "../assets/listing_0045_challenge_register_movs", */
+        "../assets/listing_0046_add_sub_cmp",
     };
 
     for (I = 0; I < ARRAY_COUNT(FilePaths); ++I)
