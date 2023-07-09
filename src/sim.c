@@ -223,6 +223,17 @@ static s32 ErrorMessageAndCode(char *Message, s32 Code)
     return Code;
 }
 
+static s32 OnesCount(u16 Value)
+{
+    // NOTE: Hacker's Delight, Figure 5-2
+    Value = Value - ((Value >> 1) & 0x55555555);
+    Value = (Value & 0x33333333) + ((Value >> 2) & 0x33333333);
+    Value = (Value + (Value >> 4)) & 0x0F0F0F0F;
+    Value = Value + (Value >> 8);
+    Value = Value + (Value >> 16);
+    return Value & 0x0000003F;
+}
+
 static s16 GetImmediate(buffer *OpcodeBuffer, s32 Offset, s32 IsWord)
 {
     u8 FirstImmediateByte = OpcodeBuffer->Data[OpcodeBuffer->Index + Offset];
@@ -267,20 +278,21 @@ static s32 ReadRegister(register_name RegisterName)
     return 0;
 }
 
+static void SetFlag(flag Flag, s32 ShouldSet)
+{
+    GlobalFlags = ShouldSet ? SET_FLAG(GlobalFlags, Flag) : UNSET_FLAG(GlobalFlags, Flag);
+}
+
 static void UpdateFlags(s16 ResultValue)
 {
-    printf("flag_Zero %x\n", ResultValue == 0);
-    printf("flag_Sign %x\n", ResultValue & 0x80);
-    printf("GlobalFlags %x\n", GlobalFlags);
-    GlobalFlags = SET_FLAG(GlobalFlags, flag_Zero, ResultValue == 0);
-    printf("GlobalFlags %x\n", GlobalFlags);
-    GlobalFlags = SET_FLAG(GlobalFlags, flag_Sign, ResultValue & 0x80);
-    printf("GlobalFlags %x\n", GlobalFlags);
+    SetFlag(flag_Zero, ResultValue == 0);
+    SetFlag(flag_Sign, (ResultValue & 0x8000) >> 15);
+    SetFlag(flag_Parity, OnesCount(ResultValue & 0xff) % 2 == 0);
 }
 
 static s32 WriteRegister(register_name RegisterName, s16 Value)
 {
-    printf("WriteRegister %d %d\n", RegisterName, Value);
+    printf("WriteRegister %s %d\n", DisplayRegisterName(RegisterName), Value);
     s32 RegisterIndex = RegisterIndexTable[RegisterName];
     switch(RegisterName)
     {
@@ -342,30 +354,40 @@ static s32 SimulateRegisterToRegister(simulation_mode Mode, opcode Opcode, s16 D
     {
         switch(Opcode.InstructionKind)
         {
+        case instruction_kind_Mov:
+        {
+            WriteRegister(DestinationRegister, ValueToWrite);
+        } break;
         case instruction_kind_Add:
         {
             ValueToWrite = DestinationRegisterValue + ValueToWrite;
+            UpdateFlags(ValueToWrite);
+            WriteRegister(DestinationRegister, ValueToWrite);
         } break;
         case instruction_kind_Adc:
         {
             ValueToWrite = DestinationRegisterValue + ValueToWrite;
+            UpdateFlags(ValueToWrite);
+            WriteRegister(DestinationRegister, ValueToWrite);
         } break;
         case instruction_kind_Sub:
         {
             ValueToWrite = DestinationRegisterValue - ValueToWrite;
+            UpdateFlags(ValueToWrite);
+            WriteRegister(DestinationRegister, ValueToWrite);
         } break;
         case instruction_kind_Sbb:
         {
             ValueToWrite = DestinationRegisterValue - ValueToWrite;
+            UpdateFlags(ValueToWrite);
+            WriteRegister(DestinationRegister, ValueToWrite);
         } break;
         case instruction_kind_Cmp:
         {
-            ValueToWrite = DestinationRegisterValue - ValueToWrite;
+            UpdateFlags(DestinationRegisterValue - ValueToWrite);
         } break;
         default: break;
         }
-        WriteRegister(DestinationRegister, ValueToWrite);
-        if (Opcode.InstructionKind != instruction_kind_Mov) UpdateFlags(ValueToWrite);
     } break;
     default:
         return ErrorMessageAndCode("SimulateRegisterToRegister unknown simulation_mode!\n", 1);
@@ -425,6 +447,7 @@ static s32 SimulateRegisterAndEffectiveAddress(simulation_mode Mode, opcode Opco
 
 static s32 SimulateImmediateToRegisterMemory(simulation_mode Mode, opcode Opcode, s16 DestinationRegister, char *ImmediateSizeName, s16 Immediate, s32 IsMove)
 {
+    s16 DestinationRegisterValue = ReadRegister(DestinationRegister);
     switch(Mode)
     {
     case simulation_mode_Print:
@@ -440,7 +463,45 @@ static s32 SimulateImmediateToRegisterMemory(simulation_mode Mode, opcode Opcode
         }
     } break;
     case simulation_mode_Simulate:
-        return ErrorMessageAndCode("SimulateImmediateToRegisterMemory not implemented!\n", 1);
+    {
+        switch(Opcode.InstructionKind)
+        {
+        case instruction_kind_Mov:
+        {
+            WriteRegister(DestinationRegister, Immediate);
+        } break;
+        case instruction_kind_Add:
+        {
+            Immediate = DestinationRegisterValue + Immediate;
+            UpdateFlags(Immediate);
+            WriteRegister(DestinationRegister, Immediate);
+        } break;
+        case instruction_kind_Adc:
+        {
+            Immediate = DestinationRegisterValue + Immediate;
+            UpdateFlags(Immediate);
+            WriteRegister(DestinationRegister, Immediate);
+        } break;
+        case instruction_kind_Sub:
+        {
+            Immediate = DestinationRegisterValue - Immediate;
+            UpdateFlags(Immediate);
+            WriteRegister(DestinationRegister, Immediate);
+        } break;
+        case instruction_kind_Sbb:
+        {
+            Immediate = DestinationRegisterValue - Immediate;
+            UpdateFlags(Immediate);
+            WriteRegister(DestinationRegister, Immediate);
+        } break;
+        case instruction_kind_Cmp:
+        {
+            UpdateFlags(DestinationRegisterValue - Immediate);
+        } break;
+        default:
+            return ErrorMessageAndCode("SimulateImmediateToRegisterMemory unkown instruction kind!\n", 1);
+        }
+    } break;
     default:
         return ErrorMessageAndCode("SimulateImmediateToRegisterMemory unknown simulation mode\n", 1);
     }
@@ -511,30 +572,40 @@ static s32 SimulateImmediateToRegister(simulation_mode Mode, opcode Opcode, s16 
     {
         switch(Opcode.InstructionKind)
         {
+        case instruction_kind_Mov:
+        {
+            WriteRegister(DestinationRegister, Immediate);
+        } break;
         case instruction_kind_Add:
         {
             Immediate = DestinationRegisterValue + Immediate;
+            UpdateFlags(Immediate);
+            WriteRegister(DestinationRegister, Immediate);
         } break;
         case instruction_kind_Adc:
         {
             Immediate = DestinationRegisterValue + Immediate;
+            UpdateFlags(Immediate);
+            WriteRegister(DestinationRegister, Immediate);
         } break;
         case instruction_kind_Sub:
         {
             Immediate = DestinationRegisterValue - Immediate;
+            UpdateFlags(Immediate);
+            WriteRegister(DestinationRegister, Immediate);
         } break;
         case instruction_kind_Sbb:
         {
             Immediate = DestinationRegisterValue - Immediate;
+            UpdateFlags(Immediate);
+            WriteRegister(DestinationRegister, Immediate);
         } break;
         case instruction_kind_Cmp:
         {
-            Immediate = DestinationRegisterValue - Immediate;
+            UpdateFlags(DestinationRegisterValue - Immediate);
         } break;
         default: break;
         }
-        WriteRegister(DestinationRegister, Immediate);
-        if (Opcode.InstructionKind != instruction_kind_Mov) UpdateFlags(Immediate);
     } break;
     default:
         return ErrorMessageAndCode("SimulateImmediateToRegister unknown simulation mode\n", 1);
@@ -584,7 +655,7 @@ static void DEBUG_PrintGlobalRegisters()
 {
     char *NameMap[] = {"AX", "BX", "CX", "DX", "SP", "BP", "SI", "DI", "CS", "DS", "SS", "ES"};
     s32 I;
-    printf("Registers:\n");
+    printf("----------------------\nRegisters:\n");
     for (I = 0; I < REGISTER_COUNT; ++I)
     {
         printf("  %s %0004x \n", NameMap[I], GlobalRegisters[I]);
@@ -606,7 +677,7 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer, simulation_mode Mode)
             /* TODO: there should be an error here sometimes. Like if there is a lone byte at the end of the instruction stream */
             break;
         }
-        if (Mode != simulation_mode_Print) DEBUG_PrintGlobalRegisters();
+        if (1 && Mode != simulation_mode_Print) DEBUG_PrintGlobalRegisters();
         u8 FirstByte = OpcodeBuffer->Data[OpcodeBuffer->Index];
         u8 OpcodeValue = GET_OPCODE(FirstByte);
         opcode Opcode = OpcodeTable[OpcodeValue];

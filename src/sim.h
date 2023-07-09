@@ -13,7 +13,8 @@ typedef size_t size;
 
 #define ARRAY_COUNT(a) ((s32)(sizeof(a) / sizeof((a)[0])))
 
-#define SET_FLAG(flags, flag, bool) ((((flag) * ((bool) ? 1 : 0)) & -1) | flags)
+#define SET_FLAG(flags, flag) ((flags) | (flag))
+#define UNSET_FLAG(flags, flag) ((flags) & (~flag))
 
 typedef enum
 {
