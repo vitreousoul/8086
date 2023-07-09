@@ -447,6 +447,7 @@ static s32 SimulateRegisterAndEffectiveAddress(simulation_mode Mode, opcode Opco
 
 static s32 SimulateImmediateToRegisterMemory(simulation_mode Mode, opcode Opcode, s16 DestinationRegister, char *ImmediateSizeName, s16 Immediate, s32 IsMove)
 {
+    // TODO: don't pass ImmediateSizeName, but pass a boolean that says if the immediate size is wide. We need to do this so that we properly handle signed values for single-byte immediates.
     s16 DestinationRegisterValue = ReadRegister(DestinationRegister);
     switch(Mode)
     {
@@ -510,6 +511,7 @@ static s32 SimulateImmediateToRegisterMemory(simulation_mode Mode, opcode Opcode
 
 static s32 SimulateImmediateToEffectiveAddressWithOffset(simulation_mode Mode, opcode Opcode, effective_address EffectiveAddress, char *ImmediateSizeName, s16 Immediate, s16 Displacement, s32 IsMove)
 {
+    // TODO: don't pass ImmediateSizeName, but pass a boolean that says if the immediate size is wide. We need to do this so that we properly handle signed values for single-byte immediates.
     char *EffectiveAddressDisplay = GetEffectiveAddressDisplay(EffectiveAddress);
     switch(Mode)
     {
@@ -532,6 +534,7 @@ static s32 SimulateImmediateToEffectiveAddressWithOffset(simulation_mode Mode, o
 
 static s32 SimulateImmediateToEffectiveAddress(simulation_mode Mode, opcode Opcode, effective_address EffectiveAddress, char *ImmediateSizeName, s16 Immediate, s32 IsMove, s32 IsDirectAddress, s16 DirectAddress)
 {
+    // TODO: don't pass ImmediateSizeName, but pass a boolean that says if the immediate size is wide. We need to do this so that we properly handle signed values for single-byte immediates.
     char *EffectiveAddressDisplay = GetEffectiveAddressDisplay(EffectiveAddress);
     char DirectAddressDisplay[64];
     if (IsDirectAddress)
@@ -868,7 +871,8 @@ static s32 TestSim(void)
         /* "../assets/listing_0043_immediate_movs", */
         /* "../assets/listing_0044_register_movs", */
         /* "../assets/listing_0045_challenge_register_movs", */
-        "../assets/listing_0046_add_sub_cmp",
+        /* "../assets/listing_0046_add_sub_cmp", */
+        "../assets/listing_0047_challenge_flags",
     };
 
     for (I = 0; I < ARRAY_COUNT(FilePaths); ++I)
