@@ -640,7 +640,7 @@ static s32 SimulateMemoryAccumulator(simulation_mode Mode, opcode Opcode, s16 Im
     return 0;
 }
 
-static s32 SimulateJump(simulation_mode Mode, char *JumpInstructionName, s32 InstructionOffset)
+static s32 SimulateJump(simulation_mode Mode, char *JumpInstructionName, s8 InstructionOffset)
 {
     switch(Mode)
     {
@@ -846,7 +846,7 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer, simulation_mode Mode)
         case opcode_kind_Jump:
         {
             char *JumpInstructionName = JumpInstructionNameTable[FirstByte];
-            s16 InstructionOffset = GetImmediate(OpcodeBuffer, 1, 0);
+            s8 InstructionOffset = GetImmediate(OpcodeBuffer, 1, 0);
             InstructionLength = 2;
             Result = SimulateJump(Mode, JumpInstructionName, InstructionOffset);
         } break;
@@ -863,16 +863,16 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer, simulation_mode Mode)
 static s32 TestSim(void)
 {
     s32 I, SimResult = 0;
-    simulation_mode Mode = simulation_mode_Simulate;
+    simulation_mode Mode = simulation_mode_Print;
     char *FilePaths[] = {
         /* "../assets/listing_0039_more_movs", */
         /* "../assets/listing_0040_challenge_movs", */
-        /* "../assets/listing_0041_add_sub_cmp_jnz", */
+        "../assets/listing_0041_add_sub_cmp_jnz",
         /* "../assets/listing_0043_immediate_movs", */
         /* "../assets/listing_0044_register_movs", */
         /* "../assets/listing_0045_challenge_register_movs", */
         /* "../assets/listing_0046_add_sub_cmp", */
-        "../assets/listing_0047_challenge_flags",
+        /* "../assets/listing_0047_challenge_flags", */
     };
 
     for (I = 0; I < ARRAY_COUNT(FilePaths); ++I)
