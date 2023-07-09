@@ -301,7 +301,6 @@ static s32 WriteRegister(register_name RegisterName, s16 Value)
     case UNKNOWN_REGISTER: default:
         return ErrorMessageAndCode("Write to unknown register\n", 1);
     }
-    UpdateFlags(Value);
     return 0;
 }
 
@@ -340,6 +339,7 @@ static s32 SimulateRegisterToRegister(simulation_mode Mode, opcode Opcode, s16 D
         printf("%s %s, %s\n", DisplayInstructionKind(Opcode.InstructionKind), DisplayRegisterName(DestinationRegister), DisplayRegisterName(SourceRegister));
         break;
     case simulation_mode_Simulate:
+    {
         switch(Opcode.InstructionKind)
         {
         case instruction_kind_Add:
@@ -365,7 +365,8 @@ static s32 SimulateRegisterToRegister(simulation_mode Mode, opcode Opcode, s16 D
         default: break;
         }
         WriteRegister(DestinationRegister, ValueToWrite);
-        break;
+        if (Opcode.InstructionKind != instruction_kind_Mov) UpdateFlags(ValueToWrite);
+    } break;
     default:
         return ErrorMessageAndCode("SimulateRegisterToRegister unknown simulation_mode!\n", 1);
     }
@@ -507,6 +508,7 @@ static s32 SimulateImmediateToRegister(simulation_mode Mode, opcode Opcode, s16 
         printf("%s %s, %d\n", DisplayInstructionKind(Opcode.InstructionKind), DisplayRegisterName(DestinationRegister), Immediate);
     } break;
     case simulation_mode_Simulate:
+    {
         switch(Opcode.InstructionKind)
         {
         case instruction_kind_Add:
@@ -531,7 +533,9 @@ static s32 SimulateImmediateToRegister(simulation_mode Mode, opcode Opcode, s16 
         } break;
         default: break;
         }
-        return WriteRegister(DestinationRegister, Immediate);
+        WriteRegister(DestinationRegister, Immediate);
+        if (Opcode.InstructionKind != instruction_kind_Mov) UpdateFlags(Immediate);
+    } break;
     default:
         return ErrorMessageAndCode("SimulateImmediateToRegister unknown simulation mode\n", 1);
     }
@@ -778,7 +782,7 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer, simulation_mode Mode)
         }
         OpcodeBuffer->Index += InstructionLength;
     }
-    if (Mode != simulation_mode_Print) DEBUG_PrintGlobalRegisters();
+    if (!Result && Mode != simulation_mode_Print) DEBUG_PrintGlobalRegisters();
     return Result;
 }
 
