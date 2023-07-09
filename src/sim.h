@@ -176,6 +176,11 @@ static char *DisplayInstructionKind(instruction_kind Kind)
     }
 }
 
+static char *DisplayByteSize(s32 IsWide)
+{
+    return IsWide ? "word" : "byte";
+}
+
 static void DEBUG_PrintByteInBinary(u8 Byte)
 {
     s32 I;

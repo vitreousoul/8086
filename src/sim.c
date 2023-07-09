@@ -445,10 +445,10 @@ static s32 SimulateRegisterAndEffectiveAddress(simulation_mode Mode, opcode Opco
     return 0;
 }
 
-static s32 SimulateImmediateToRegisterMemory(simulation_mode Mode, opcode Opcode, s16 DestinationRegister, char *ImmediateSizeName, s16 Immediate, s32 IsMove)
+static s32 SimulateImmediateToRegisterMemory(simulation_mode Mode, opcode Opcode, s16 DestinationRegister, s32 IsWide, s16 Immediate, s32 IsMove)
 {
-    // TODO: don't pass ImmediateSizeName, but pass a boolean that says if the immediate size is wide. We need to do this so that we properly handle signed values for single-byte immediates.
     s16 DestinationRegisterValue = ReadRegister(DestinationRegister);
+    char *ImmediateSizeName = DisplayByteSize(IsWide);
     switch(Mode)
     {
     case simulation_mode_Print:
@@ -509,9 +509,9 @@ static s32 SimulateImmediateToRegisterMemory(simulation_mode Mode, opcode Opcode
     return 0;
 }
 
-static s32 SimulateImmediateToEffectiveAddressWithOffset(simulation_mode Mode, opcode Opcode, effective_address EffectiveAddress, char *ImmediateSizeName, s16 Immediate, s16 Displacement, s32 IsMove)
+static s32 SimulateImmediateToEffectiveAddressWithOffset(simulation_mode Mode, opcode Opcode, effective_address EffectiveAddress, s32 IsWide, s16 Immediate, s16 Displacement, s32 IsMove)
 {
-    // TODO: don't pass ImmediateSizeName, but pass a boolean that says if the immediate size is wide. We need to do this so that we properly handle signed values for single-byte immediates.
+    char *ImmediateSizeName = DisplayByteSize(IsWide);
     char *EffectiveAddressDisplay = GetEffectiveAddressDisplay(EffectiveAddress);
     switch(Mode)
     {
@@ -532,9 +532,9 @@ static s32 SimulateImmediateToEffectiveAddressWithOffset(simulation_mode Mode, o
     return 0;
 }
 
-static s32 SimulateImmediateToEffectiveAddress(simulation_mode Mode, opcode Opcode, effective_address EffectiveAddress, char *ImmediateSizeName, s16 Immediate, s32 IsMove, s32 IsDirectAddress, s16 DirectAddress)
+static s32 SimulateImmediateToEffectiveAddress(simulation_mode Mode, opcode Opcode, effective_address EffectiveAddress, s32 IsWide, s16 Immediate, s32 IsMove, s32 IsDirectAddress, s16 DirectAddress)
 {
-    // TODO: don't pass ImmediateSizeName, but pass a boolean that says if the immediate size is wide. We need to do this so that we properly handle signed values for single-byte immediates.
+    char *ImmediateSizeName = DisplayByteSize(IsWide);
     char *EffectiveAddressDisplay = GetEffectiveAddressDisplay(EffectiveAddress);
     char DirectAddressDisplay[64];
     if (IsDirectAddress)
@@ -753,7 +753,6 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer, simulation_mode Mode)
             s32 IsMove = OpcodeValue == MOV_IMMEDIATE_TO_REGISTER_MEMORY;
             s32 IsMoveAndWideData = IsMove && W;
             s32 IsWideData = IsMoveAndWideData || (!IsMove && !D && W);
-            char *ImmediateSizeName = W ? "word" : "byte";
             s16 MOD = GET_MOD(SecondByte);
             s16 REG = GET_REG(SecondByte);
             s16 RM = GET_RM(SecondByte);
@@ -771,7 +770,7 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer, simulation_mode Mode)
                 InstructionLength = IsWideData ? 4 : 3;
                 s16 Immediate = GetImmediate(OpcodeBuffer, 2, IsWideData);
                 s16 DestinationRegister = RegTable[RM][W];
-                Result = SimulateImmediateToRegisterMemory(Mode, Opcode, DestinationRegister, ImmediateSizeName, Immediate, IsMove);
+                Result = SimulateImmediateToRegisterMemory(Mode, Opcode, DestinationRegister, W, Immediate, IsMove);
             }
             else
             {
@@ -779,7 +778,6 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer, simulation_mode Mode)
                 if (MOD == 0b01 || MOD == 0b10)
                 {
                     s16 IsWideDisplacement = MOD == 0b10;
-                    ImmediateSizeName = IsWideDisplacement ? "word" : "byte";
                     if (MOD == 0b01)
                     {
                         InstructionLength = IsWideData ? 5 : 4;
@@ -795,7 +793,7 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer, simulation_mode Mode)
                         return ErrorMessageAndCode("opcode_kind_ImmediateToRegisterMemory unexpected end of buffer\n", 1);
                     }
                     s16 Immediate = GetImmediate(OpcodeBuffer, ImmediateOffset, IsWideData);
-                    Result = SimulateImmediateToEffectiveAddressWithOffset(Mode, Opcode, EffectiveAddress, ImmediateSizeName, Immediate, Displacement, IsMove);
+                    Result = SimulateImmediateToEffectiveAddressWithOffset(Mode, Opcode, EffectiveAddress, IsWideDisplacement, Immediate, Displacement, IsMove);
                 }
                 else
                 {
@@ -811,7 +809,7 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer, simulation_mode Mode)
                         Immediate = GetImmediate(OpcodeBuffer, 4, IsWideData);
                         InstructionLength = IsWideData ? 6 : 5;
                     }
-                    Result = SimulateImmediateToEffectiveAddress(Mode, Opcode, EffectiveAddress, ImmediateSizeName, Immediate, IsMove, IsDirectAddress, DirectAddress);
+                    Result = SimulateImmediateToEffectiveAddress(Mode, Opcode, EffectiveAddress, W, Immediate, IsMove, IsDirectAddress, DirectAddress);
                 }
             }
         } break;
@@ -863,16 +861,16 @@ static s32 SimulateBuffer(buffer *OpcodeBuffer, simulation_mode Mode)
 static s32 TestSim(void)
 {
     s32 I, SimResult = 0;
-    simulation_mode Mode = simulation_mode_Print;
+    simulation_mode Mode = simulation_mode_Simulate;
     char *FilePaths[] = {
         /* "../assets/listing_0039_more_movs", */
         /* "../assets/listing_0040_challenge_movs", */
-        "../assets/listing_0041_add_sub_cmp_jnz",
+        /* "../assets/listing_0041_add_sub_cmp_jnz", */
         /* "../assets/listing_0043_immediate_movs", */
         /* "../assets/listing_0044_register_movs", */
         /* "../assets/listing_0045_challenge_register_movs", */
         /* "../assets/listing_0046_add_sub_cmp", */
-        /* "../assets/listing_0047_challenge_flags", */
+        "../assets/listing_0047_challenge_flags",
     };
 
     for (I = 0; I < ARRAY_COUNT(FilePaths); ++I)
