@@ -664,6 +664,7 @@ static s32 SimulateMemoryAccumulator(simulation_mode Mode, opcode Opcode, s16 Im
 static s32 SimulateJump(buffer *InstructionBuffer, simulation_mode Mode, s8 InstructionOffset)
 {
     char *JumpInstructionName = JumpInstructionNameTable[InstructionBuffer->Data[InstructionBuffer->Index]];
+    s32 JumpIndex = InstructionBuffer->Index + InstructionOffset;
     switch(Mode)
     {
     case simulation_mode_Print:
@@ -676,11 +677,11 @@ static s32 SimulateJump(buffer *InstructionBuffer, simulation_mode Mode, s8 Inst
         {
         case JE:
         {
-            if (GET_FLAG(GlobalFlags, flag_Zero)) SetInstructionBufferIndex(InstructionBuffer, InstructionBuffer->Index + InstructionOffset);
+            if (GET_FLAG(GlobalFlags, flag_Zero)) SetInstructionBufferIndex(InstructionBuffer, JumpIndex);
         } break;
         case JNE:
         {
-            if (!GET_FLAG(GlobalFlags, flag_Zero)) SetInstructionBufferIndex(InstructionBuffer, InstructionBuffer->Index + InstructionOffset);
+            if (!GET_FLAG(GlobalFlags, flag_Zero)) SetInstructionBufferIndex(InstructionBuffer, JumpIndex);
         } break;
         case JL: case JNL:
         case JLE: case JNLE:
