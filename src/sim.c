@@ -72,6 +72,8 @@
 u16 GlobalRegisters[REGISTER_COUNT] = {};
 #define FLAG_COUNT 9
 u16 GlobalFlags = 0;
+#define GLOBAL_MEMORY_SIZE 1024 * 1024
+u8 GlobalMemory[GLOBAL_MEMORY_SIZE];
 
 s32 RegisterIndexTable[32] = {
     [AX] = 0, [AH] = 0, [AL] = 0,
@@ -306,6 +308,17 @@ static s32 WriteRegister(register_name RegisterName, s16 Value)
     case UNKNOWN_REGISTER: default:
         return ErrorMessageAndCode("Write to unknown register\n", 1);
     }
+    return 0;
+}
+
+static s32 WriteMemory(s32 MemoryIndex, s16 Value, s32 IsWide)
+{
+    if (MemoryIndex < 0 || MemoryIndex >= GLOBAL_MEMORY_SIZE)
+    {
+        printf("MemoryIndex %d\n", MemoryIndex);
+        return ErrorMessageAndCode("WriteMemory memory index out-of-bounds\n", 1);
+    }
+    GlobalMemory[MemoryIndex] = Value;
     return 0;
 }
 
@@ -558,6 +571,7 @@ static s32 SimulateImmediateToEffectiveAddress(simulation_mode Mode, opcode Opco
     char *ImmediateSizeName = DisplayByteSize(IsWide);
     char *EffectiveAddressDisplay = GetEffectiveAddressDisplay(EffectiveAddress);
     char DirectAddressDisplay[64];
+    if (!IsWide) return ErrorMessageAndCode("SimulateImmediateToEffectiveAddress byte sized instructions not implemented!\n", 1);
     if (IsDirectAddress)
     {
         sprintf(DirectAddressDisplay, "[%d]%c", DirectAddress, 0);
@@ -574,6 +588,42 @@ static s32 SimulateImmediateToEffectiveAddress(simulation_mode Mode, opcode Opco
         else
         {
             printf("%s %s %s, %d\n", DisplayInstructionKind(Opcode.InstructionKind), ImmediateSizeName, EffectiveAddressDisplay, Immediate);
+        }
+    } break;
+    case simulation_mode_Simulate:
+    {
+        switch(EffectiveAddress)
+        {
+        case eac_DIRECT_ADDRESS:
+            if (!IsDirectAddress) return ErrorMessageAndCode("SimulateImmediateToEffectiveAddress reached eac_DIRECT_ADDRESS but IsDirectAddress is false!\n", 1);
+            return WriteMemory(DirectAddress, Immediate, IsWide);
+        case eac_BX_SI:
+        case eac_BX_DI:
+        case eac_BP_SI:
+        case eac_BP_DI:
+        case eac_SI:
+        case eac_DI:
+        case eac_BX:
+        case eac_BX_SI_D8:
+        case eac_BX_DI_D8:
+        case eac_BP_SI_D8:
+        case eac_BP_DI_D8:
+        case eac_SI_D8:
+        case eac_DI_D8:
+        case eac_BP_D8:
+        case eac_BX_D8:
+        case eac_BX_SI_D16:
+        case eac_BX_DI_D16:
+        case eac_BP_SI_D16:
+        case eac_BP_DI_D16:
+        case eac_SI_D16:
+        case eac_DI_D16:
+        case eac_BP_D16:
+        case eac_BX_D16:
+        case eac_NONE:
+        default:
+            printf("EffectiveAddress %d %s\n", EffectiveAddress, GetEffectiveAddressDisplay(EffectiveAddress));
+            return ErrorMessageAndCode("SimulateImmediateToEffectiveAddress effective address not implememented\n", 1);
         }
     } break;
     default:
@@ -922,7 +972,8 @@ static s32 TestSim(void)
         /* "../assets/listing_0046_add_sub_cmp", */
         /* "../assets/listing_0047_challenge_flags", */
         /* "../assets/listing_0048_ip_register", */
-        "../assets/listing_0049_conditional_jumps",
+        /* "../assets/listing_0049_conditional_jumps", */
+        "../assets/listing_0051_memory_mov",
     };
 
     for (I = 0; I < ARRAY_COUNT(FilePaths); ++I)
