@@ -253,6 +253,7 @@ static s32 GetRegisterIndex(s32 RegOrRM, s32 IsWide, s32 IsSegment)
 
 static s32 ReadRegister(register_name RegisterName)
 {
+    printf("ReadRegister %s\n", DisplayRegisterName(RegisterName));
     s32 RegisterIndex = RegisterIndexTable[RegisterName];
     switch(RegisterName)
     {
@@ -272,7 +273,7 @@ static s32 ReadRegister(register_name RegisterName)
         return GlobalRegisters[RegisterIndex] & 0xff;
     } break;
     case UNKNOWN_REGISTER: default:
-        return ErrorMessageAndCode("Read from unknown register\n", 1);
+        return ErrorMessageAndCode("Read from unknown register\n", 0x7fffffff);
     }
     return 0;
 }
@@ -304,8 +305,20 @@ static s32 WriteRegister(register_name RegisterName, s16 Value)
     return 0;
 }
 
+static s32 ReadMemory(s32 MemoryIndex, s32 IsWide)
+{
+    printf("ReadMemory %x %d\n", MemoryIndex, MemoryIndex);
+    if (MemoryIndex < 0 || MemoryIndex >= GLOBAL_MEMORY_SIZE)
+    {
+        printf("MemoryIndex %d\n", MemoryIndex);
+        return ErrorMessageAndCode("ReadMemory memory index out-of-bounds\n", 1);
+    }
+    return GlobalMemory[MemoryIndex];
+}
+
 static s32 WriteMemory(s32 MemoryIndex, s16 Value, s32 IsWide)
 {
+    printf("WriteMemory %x %d <- %x %d\n", MemoryIndex, MemoryIndex, Value, Value);
     if (MemoryIndex < 0 || MemoryIndex >= GLOBAL_MEMORY_SIZE)
     {
         printf("MemoryIndex %d\n", MemoryIndex);
@@ -337,6 +350,41 @@ static instruction_kind GetInstructionKindForArithmeticImmediateFromRegisterMemo
     case 0b011: return instruction_kind_Sbb;
     case 0b111: return instruction_kind_Cmp;
     default: return instruction_kind_NONE;
+    }
+}
+
+static s32 GetMemoryIndexFromEffectiveAddress(effective_address EffectiveAddress, s32 Offset)
+{
+    switch(EffectiveAddress)
+    {
+    case eac_BX: return ReadRegister(BX);
+    case eac_BX_SI: return ReadRegister(BX) + ReadRegister(SI);
+        // NOTE: eac_BX_D8 falls through to eac_BX_D16, but maybe we need to handle byte-sized offsets differently?
+    case eac_BX_D8: case eac_BX_D16:
+        return ReadRegister(BX) + Offset;
+    case eac_BX_SI_D8: case eac_BX_SI_D16:
+        return ReadRegister(BX) + ReadRegister(SI) + Offset;
+    case eac_BX_DI_D8: case eac_BX_DI_D16:
+        return ReadRegister(BX) + ReadRegister(DI) + Offset;
+    case eac_BP_SI_D8: case eac_BP_SI_D16:
+        return ReadRegister(BP) + ReadRegister(SI) + Offset;
+    case eac_BP_DI_D8: case eac_BP_DI_D16:
+        return ReadRegister(BP) + ReadRegister(DI) + Offset;
+    case eac_BX_DI: return ReadRegister(BX) + ReadRegister(DI);
+    case eac_BP_SI: return ReadRegister(BP) + ReadRegister(SI);
+    case eac_BP_DI: return ReadRegister(BP) + ReadRegister(DI);
+    case eac_SI: return ReadRegister(SI);
+    case eac_DI: return ReadRegister(DI);
+    case eac_DIRECT_ADDRESS:
+    case eac_SI_D8: case eac_SI_D16:
+        return ReadRegister(SI) + Offset;
+    case eac_DI_D8: case eac_DI_D16:
+        return ReadRegister(DI) + Offset;
+    case eac_BP_D8: case eac_BP_D16:
+        return ReadRegister(BP) + Offset;
+    default:
+        printf("EffectiveAddress %s\n", GetEffectiveAddressDisplay(EffectiveAddress));
+        return ErrorMessageAndCode("GetMemoryIndexFromEffectiveAddress effective address not implemented\n", -1);
     }
 }
 
@@ -443,6 +491,10 @@ static s32 SimulateRegisterAndEffectiveAddress(simulation_mode Mode, opcode Opco
 {
     char DirectAddressDisplay[64];
     char *EffectiveAddressDisplay = GetEffectiveAddressDisplay(EffectiveAddress);
+    char *InstructionKindString = DisplayInstructionKind(Opcode.InstructionKind);
+    s32 ValueToWrite = 0;
+    s32 MemoryIndex = -1;
+    s32 IsWide = 1; // TODO: IsWide should be determined in some way, using the effective address or passing in a new IsWide argument.
     if (IsDirectAddress)
     {
         sprintf(DirectAddressDisplay, "[%d]%c", Immediate, 0);
@@ -452,19 +504,58 @@ static s32 SimulateRegisterAndEffectiveAddress(simulation_mode Mode, opcode Opco
     {
     case simulation_mode_Print:
     {
+        char *DestinationRegisterString = DisplayRegisterName(DestinationRegister);
         if (D)
         {
-            printf("%s %s, %s\n", DisplayInstructionKind(Opcode.InstructionKind), DisplayRegisterName(DestinationRegister), EffectiveAddressDisplay);
+            printf("%s %s, %s\n", InstructionKindString, DestinationRegisterString, EffectiveAddressDisplay);
         }
         else
         {
-            printf("%s %s, %s\n", DisplayInstructionKind(Opcode.InstructionKind), EffectiveAddressDisplay, DisplayRegisterName(DestinationRegister));
+            printf("%s %s, %s\n", InstructionKindString, EffectiveAddressDisplay, DestinationRegisterString);
         }
     } break;
     case simulation_mode_Simulate:
     {
-        if (IsDirectAddress) return ErrorMessageAndCode("SimulateRegisterAndEffectiveAddress IsDirectAddress code-path not implemented\n", 1);
-        return ErrorMessageAndCode("SimulateRegisterAndEffectiveAddress not implemented!\n", 1);
+        MemoryIndex = IsDirectAddress ? Immediate : GetMemoryIndexFromEffectiveAddress(EffectiveAddress, 0);
+        s16 MemoryValue = ReadMemory(MemoryIndex, IsWide);
+        s16 RegisterValue = ReadRegister(DestinationRegister);
+        switch(Opcode.InstructionKind)
+        {
+        case instruction_kind_Mov:
+            ValueToWrite = D ? MemoryValue : RegisterValue;
+            break;
+        case instruction_kind_Add:
+            ValueToWrite = MemoryValue + RegisterValue;
+            UpdateFlags(ValueToWrite);
+            break;
+        case instruction_kind_Adc:
+            ValueToWrite = MemoryValue + RegisterValue;
+            UpdateFlags(ValueToWrite);
+            break;
+        case instruction_kind_Sub:
+            ValueToWrite = MemoryValue - RegisterValue;
+            UpdateFlags(ValueToWrite);
+            break;
+        case instruction_kind_Sbb:
+            ValueToWrite = MemoryValue - RegisterValue;
+            UpdateFlags(ValueToWrite);
+            break;
+        case instruction_kind_Cmp:
+            ValueToWrite = MemoryValue - RegisterValue;
+            break;
+
+        default:
+            printf("InstructionKind %s\n", InstructionKindString);
+            return ErrorMessageAndCode("SimulateRegisterAndEffectiveAddress instruction kind not implemented\n", 1);
+        }
+        if (D)
+        {
+            WriteRegister(DestinationRegister, ValueToWrite);
+        }
+        else
+        {
+            WriteMemory(MemoryIndex, ValueToWrite, IsWide);
+        }
     } break;
     default:
         return ErrorMessageAndCode("SimulateRegisterAndEffectiveAddress unknown simulation mode\n", 1);
@@ -481,13 +572,14 @@ static s32 SimulateImmediateToRegisterMemory(simulation_mode Mode, opcode Opcode
     case simulation_mode_Print:
     {
         char *RegisterName = DisplayRegisterName(DestinationRegister);
+        char *InstructionKindString = DisplayInstructionKind(Opcode.InstructionKind);
         if (IsMove)
         {
-            printf("%s %s, %s %d\n", DisplayInstructionKind(Opcode.InstructionKind), RegisterName, ImmediateSizeName, Immediate);
+            printf("%s %s, %s %d\n", InstructionKindString, RegisterName, ImmediateSizeName, Immediate);
         }
         else
         {
-            printf("%s %s %s, %d\n", DisplayInstructionKind(Opcode.InstructionKind), ImmediateSizeName, RegisterName, Immediate);
+            printf("%s %s %s, %d\n", InstructionKindString, ImmediateSizeName, RegisterName, Immediate);
         }
     } break;
     case simulation_mode_Simulate:
@@ -536,10 +628,12 @@ static s32 SimulateImmediateToRegisterMemory(simulation_mode Mode, opcode Opcode
     return 0;
 }
 
-static s32 SimulateImmediateToEffectiveAddressWithOffset(simulation_mode Mode, opcode Opcode, effective_address EffectiveAddress, s32 IsWide, s16 Immediate, s16 Displacement, s32 IsMove)
+static s32 SimulateImmediateToEffectiveAddressWithOffset(simulation_mode Mode, opcode Opcode, effective_address EffectiveAddress, s32 IsWideDisplacement, s16 Immediate, s16 Displacement, s32 IsMove, s32 IsWide)
 {
     char *ImmediateSizeName = DisplayByteSize(IsWide);
     char *EffectiveAddressDisplay = GetEffectiveAddressDisplay(EffectiveAddress);
+    s32 MemoryIndex = -1;
+    if (!IsWide) return ErrorMessageAndCode("SimulateImmediateToEffectiveAddressWithOffset byte sized instructions not implemented!\n", 1);
     switch(Mode)
     {
     case simulation_mode_Print:
@@ -553,9 +647,32 @@ static s32 SimulateImmediateToEffectiveAddressWithOffset(simulation_mode Mode, o
             printf("%s %s %s %d], %d\n", DisplayInstructionKind(Opcode.InstructionKind), ImmediateSizeName, EffectiveAddressDisplay, Displacement, Immediate);
         }
     } break;
+    case simulation_mode_Simulate:
+    {
+        switch(EffectiveAddress)
+        {
+        case eac_BX_SI_D8: case eac_BX_DI_D8: case eac_BP_SI_D8: case eac_BP_DI_D8:
+        case eac_BX_SI_D16: case eac_BX_DI_D16: case eac_BP_SI_D16: case eac_BP_DI_D16:
+        case eac_SI_D8: case eac_DI_D8: case eac_BP_D8: case eac_BX_D8:
+        case eac_SI_D16: case eac_DI_D16: case eac_BP_D16: case eac_BX_D16:
+        {
+            MemoryIndex = GetMemoryIndexFromEffectiveAddress(EffectiveAddress, Displacement);
+            printf("MemoryIndex %d\n", MemoryIndex);
+        } break;
+        // TODO: nocommit we shouldn't need to check the NON-offset paths, since that is done in SimulateImmediateToEffectiveAddress
+        case eac_BX_SI: case eac_BX_DI:
+        case eac_BP_SI: case eac_BP_DI:
+        case eac_SI: case eac_DI: case eac_BX:
+        case eac_DIRECT_ADDRESS: case eac_NONE:
+        default:
+            printf("EffectiveAddress %d %s\n", EffectiveAddress, GetEffectiveAddressDisplay(EffectiveAddress));
+            return ErrorMessageAndCode("SimulateImmediateToEffectiveAddressWithOffset effective address not implememented\n", 1);
+        }
+    } break;
     default:
-        return ErrorMessageAndCode("SimulateImmediateToEffectiveAddressWithOffset not implemented!\n", 1);
+        return ErrorMessageAndCode("SimulateImmediateToEffectiveAddressWithOffset unknown simulation mode\n", 1);
     }
+    WriteMemory(MemoryIndex, Immediate, IsWide);
     return 0;
 }
 
@@ -597,6 +714,7 @@ static s32 SimulateImmediateToEffectiveAddress(simulation_mode Mode, opcode Opco
         case eac_SI:
         case eac_DI:
         case eac_BX:
+        // TODO: nocommit we shouldn't need to check the offset paths, since that is done in SimulateImmediateToEffectiveAddressWithOffset
         case eac_BX_SI_D8:
         case eac_BX_DI_D8:
         case eac_BP_SI_D8:
@@ -755,7 +873,7 @@ static void DEBUG_PrintGlobalRegisters()
     printf("----------------------\nRegisters:\n");
     for (I = 0; I < REGISTER_COUNT; ++I)
     {
-        printf("  %s %0004x \n", NameMap[I], GlobalRegisters[I]);
+        if (GlobalRegisters[I]) printf("  %s %0004x \n", NameMap[I], GlobalRegisters[I]);
     }
     printf("\nFlags:           DIOSZAPC\n      ");
     DEBUG_PrintByteInBinary(0xff & (GlobalFlags >> 8));
@@ -887,7 +1005,7 @@ static s32 SimulateBuffer(buffer *InstructionBuffer, simulation_mode Mode)
                         return ErrorMessageAndCode("opcode_kind_ImmediateToRegisterMemory unexpected end of buffer\n", 1);
                     }
                     s16 Immediate = GetImmediate(InstructionBuffer, ImmediateOffset, IsWideData);
-                    Result = SimulateImmediateToEffectiveAddressWithOffset(Mode, Opcode, EffectiveAddress, IsWideDisplacement, Immediate, Displacement, IsMove);
+                    Result = SimulateImmediateToEffectiveAddressWithOffset(Mode, Opcode, EffectiveAddress, IsWideDisplacement, Immediate, Displacement, IsMove, W);
                 }
                 else
                 {
@@ -966,7 +1084,9 @@ static s32 TestSim(void)
         /* "../assets/listing_0047_challenge_flags", */
         /* "../assets/listing_0048_ip_register", */
         /* "../assets/listing_0049_conditional_jumps", */
-        "../assets/listing_0051_memory_mov",
+        /* "../assets/listing_0051_memory_mov", */
+        /* "../assets/listing_0052_memory_add_loop", */
+        "../assets/listing_0053_add_loop_challenge",
     };
 
     for (I = 0; I < ARRAY_COUNT(FilePaths); ++I)
