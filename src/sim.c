@@ -896,7 +896,8 @@ static s32 TestSim(void)
         /* "../assets/listing_0045_challenge_register_movs", */
         /* "../assets/listing_0046_add_sub_cmp", */
         /* "../assets/listing_0047_challenge_flags", */
-        "../assets/listing_0048_ip_register",
+        /* "../assets/listing_0048_ip_register", */
+        "../assets/listing_0049_conditional_jumps",
     };
 
     for (I = 0; I < ARRAY_COUNT(FilePaths); ++I)
