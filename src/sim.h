@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <string.h>
 
 typedef uint8_t u8;
 typedef uint16_t u16;
@@ -27,6 +28,7 @@ typedef enum
    opcode_kind_SegmentRegister,
    opcode_kind_RegisterToRegisterMemory,
    opcode_kind_Jump,
+   opcode_kind_Halt,
 } opcode_kind;
 
 typedef enum
@@ -154,6 +156,8 @@ static char *DisplayOpcodeKind(opcode_kind Kind)
     case opcode_kind_MemoryAccumulator: return "opcode_kind_MemoryAccumulator";
     case opcode_kind_SegmentRegister: return "opcode_kind_SegmentRegister";
     case opcode_kind_RegisterToRegisterMemory: return "opcode_kind_RegisterToRegisterMemory";
+    case opcode_kind_Halt: return "opcode_kind_Halt";
+    case opcode_kind_Jump: return "opcode_kind_Jump";
     case opcode_kind_None: default: return "opcode_kind_None";
     }
 }
