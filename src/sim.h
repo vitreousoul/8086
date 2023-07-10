@@ -55,6 +55,7 @@ typedef enum
     DX, DH, DL,
     SP, BP, SI, DI,
     CS, DS, SS, ES,
+    IP,
 } register_name;
 
 typedef enum
@@ -156,6 +157,7 @@ static char *DisplayRegisterName(register_name Name)
     case DS: return "DS";
     case SS: return "SS";
     case ES: return "ES";
+    case IP: return "IP";
     default:
     case UNKNOWN_REGISTER: return "UNKNOWN_REGISTER";
     }

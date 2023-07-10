@@ -1,3 +1,5 @@
+// TODO: implement carry flag!
+
 /*
   Comments with the DOCS: tag are usually copy-pasted from the 8086 manual:
   https://archive.org/details/bitsavers_intel80869lyUsersManualOct79_62967963
@@ -66,7 +68,7 @@
 #define MOV_IMMEDIATE_TO_REGISTER_MEMORY 0b110001
 #define MOV_ACCUMULATOR_TO_FROM_MEMORY 0b101000
 
-#define REGISTER_COUNT 12
+#define REGISTER_COUNT 13
 u16 GlobalRegisters[REGISTER_COUNT] = {};
 #define FLAG_COUNT 9
 u16 GlobalFlags = 0;
@@ -78,6 +80,7 @@ s32 RegisterIndexTable[32] = {
     [DX] = 3, [DH] = 3, [DL] = 3,
     [SP] = 4, [BP] = 5, [SI] = 6, [DI] = 7,
     [CS] = 8, [DS] = 9, [SS] = 10, [ES] = 11,
+    [IP] = 12,
 };
 
 opcode OpcodeTable[OPCODE_COUNT] = {
@@ -261,6 +264,7 @@ static s32 ReadRegister(register_name RegisterName)
     case AX: case BX: case CX: case DX:
     case SP: case BP: case SI: case DI:
     case CS: case DS: case SS: case ES:
+    case IP:
     {
         return GlobalRegisters[RegisterIndex];
     } break;
@@ -273,7 +277,7 @@ static s32 ReadRegister(register_name RegisterName)
         return GlobalRegisters[RegisterIndex] & 0xff;
     } break;
     case UNKNOWN_REGISTER: default:
-        return ErrorMessageAndCode("Write to unknown register\n", 1);
+        return ErrorMessageAndCode("Read from unknown register\n", 1);
     }
     return 0;
 }
@@ -299,6 +303,7 @@ static s32 WriteRegister(register_name RegisterName, s16 Value)
     case AX: case BX: case CX: case DX:
     case SP: case BP: case SI: case DI:
     case CS: case DS: case SS: case ES:
+    case IP:
     {
         GlobalRegisters[RegisterIndex] = Value;
     } break;
@@ -327,6 +332,13 @@ static instruction_kind GetInstructionKindForArithmeticImmediateFromRegisterMemo
     case 0b111: return instruction_kind_Cmp;
     default: return instruction_kind_NONE;
     }
+}
+
+static void SetInstructionBufferIndex(buffer *InstructionBuffer, s32 Index)
+{
+    // The IP is just the instruction-buffer's index, so we sync the writes here. Maybe at some point it would make more sense to _only_ use the IP register to read the instruction bytes.
+    InstructionBuffer->Index = Index;
+    WriteRegister(IP, Index);
 }
 
 static s32 InitSimulation(simulation_mode Mode)
@@ -445,6 +457,7 @@ static s32 SimulateRegisterAndEffectiveAddress(simulation_mode Mode, opcode Opco
     } break;
     case simulation_mode_Simulate:
     {
+        if (IsDirectAddress) return ErrorMessageAndCode("SimulateRegisterAndEffectiveAddress IsDirectAddress code-path not implemented\n", 1);
         return ErrorMessageAndCode("SimulateRegisterAndEffectiveAddress not implemented!\n", 1);
     } break;
     default:
@@ -658,7 +671,7 @@ static s32 SimulateJump(buffer *InstructionBuffer, simulation_mode Mode, char *J
     } break;
     case simulation_mode_Simulate:
     {
-        InstructionBuffer->Index = InstructionBuffer->Index + InstructionOffset;
+        SetInstructionBufferIndex(InstructionBuffer, InstructionBuffer->Index + InstructionOffset);
     } break;
     default:
         return ErrorMessageAndCode("SimulateJump unknown simulation mode\n", 1);
@@ -668,7 +681,7 @@ static s32 SimulateJump(buffer *InstructionBuffer, simulation_mode Mode, char *J
 
 static void DEBUG_PrintGlobalRegisters()
 {
-    char *NameMap[] = {"AX", "BX", "CX", "DX", "SP", "BP", "SI", "DI", "CS", "DS", "SS", "ES"};
+    char *NameMap[] = {"AX", "BX", "CX", "DX", "SP", "BP", "SI", "DI", "CS", "DS", "SS", "ES", "IP"};
     s32 I;
     printf("----------------------\nRegisters:\n");
     for (I = 0; I < REGISTER_COUNT; ++I)
@@ -864,7 +877,7 @@ static s32 SimulateBuffer(buffer *InstructionBuffer, simulation_mode Mode)
             printf("FirstByte"); DEBUG_PrintByteInBinary(FirstByte); printf("\n");
             return ErrorMessageAndCode("SimulateBuffer default error\n", -1);
         }
-        InstructionBuffer->Index += InstructionLength;
+        SetInstructionBufferIndex(InstructionBuffer, InstructionBuffer->Index + InstructionLength);
     }
     if (!Result && Mode != simulation_mode_Print) DEBUG_PrintGlobalRegisters();
     return Result;
@@ -883,7 +896,7 @@ static s32 TestSim(void)
         /* "../assets/listing_0045_challenge_register_movs", */
         /* "../assets/listing_0046_add_sub_cmp", */
         /* "../assets/listing_0047_challenge_flags", */
-        "../assets/listing_0048_ip_register.asm",
+        "../assets/listing_0048_ip_register",
     };
 
     for (I = 0; I < ARRAY_COUNT(FilePaths); ++I)
