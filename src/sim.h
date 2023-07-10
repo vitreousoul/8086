@@ -13,6 +13,7 @@ typedef size_t size;
 
 #define ARRAY_COUNT(a) ((s32)(sizeof(a) / sizeof((a)[0])))
 
+#define GET_FLAG(flags, flag) ((flags & (flag)) || 0)
 #define SET_FLAG(flags, flag) ((flags) | (flag))
 #define UNSET_FLAG(flags, flag) ((flags) & (~flag))
 
@@ -112,6 +113,30 @@ typedef enum
     eac_BP_D16,
     eac_BX_D16,
 } effective_address;
+
+typedef enum
+{
+  JE     = 0b01110100, // jz
+  JL     = 0b01111100, // jnge
+  JLE    = 0b01111110, // jng
+  JB     = 0b01110010, // jnae
+  JBE    = 0b01110110, // jna
+  JP     = 0b01111010, // jpe
+  JO     = 0b01110000,
+  JS     = 0b01111000,
+  JNE    = 0b01110101, // jnz
+  JNL    = 0b01111101, // jge
+  JNLE   = 0b01111111, // jg
+  JNB    = 0b01110011, // jae
+  JNBE   = 0b01110111, // ja
+  JNP    = 0b01111011, // jpo
+  JNO    = 0b01110001,
+  JNS    = 0b01111001,
+  LOOP   = 0b11100010,
+  LOOPZ  = 0b11100001, // loope
+  LOOPNZ = 0b11100000, // loopne
+  JCXZ   = 0b11100011,
+} jump_instruction;
 
 typedef enum
 {

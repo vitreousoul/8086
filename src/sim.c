@@ -661,8 +661,9 @@ static s32 SimulateMemoryAccumulator(simulation_mode Mode, opcode Opcode, s16 Im
     return 0;
 }
 
-static s32 SimulateJump(buffer *InstructionBuffer, simulation_mode Mode, char *JumpInstructionName, s8 InstructionOffset)
+static s32 SimulateJump(buffer *InstructionBuffer, simulation_mode Mode, s8 InstructionOffset)
 {
+    char *JumpInstructionName = JumpInstructionNameTable[InstructionBuffer->Data[InstructionBuffer->Index]];
     switch(Mode)
     {
     case simulation_mode_Print:
@@ -671,7 +672,31 @@ static s32 SimulateJump(buffer *InstructionBuffer, simulation_mode Mode, char *J
     } break;
     case simulation_mode_Simulate:
     {
-        SetInstructionBufferIndex(InstructionBuffer, InstructionBuffer->Index + InstructionOffset);
+        switch(InstructionBuffer->Data[InstructionBuffer->Index])
+        {
+        case JE:
+        {
+            if (GET_FLAG(GlobalFlags, flag_Zero)) SetInstructionBufferIndex(InstructionBuffer, InstructionBuffer->Index + InstructionOffset);
+        } break;
+        case JNE:
+        {
+            if (!GET_FLAG(GlobalFlags, flag_Zero)) SetInstructionBufferIndex(InstructionBuffer, InstructionBuffer->Index + InstructionOffset);
+        } break;
+        case JL: case JNL:
+        case JLE: case JNLE:
+        case JB: case JNB:
+        case JBE: case JNBE:
+        case JP: case JNP:
+        case JO: case JNO:
+        case JS: case JNS:
+        case LOOP:
+        case LOOPZ:
+        case LOOPNZ:
+        case JCXZ:
+        default:
+            printf("Jump Instruction %s\n", JumpInstructionName);
+            return ErrorMessageAndCode("SimulateJump instruction not implemented", 1);
+        }
     } break;
     default:
         return ErrorMessageAndCode("SimulateJump unknown simulation mode\n", 1);
@@ -868,10 +893,9 @@ static s32 SimulateBuffer(buffer *InstructionBuffer, simulation_mode Mode)
             return ErrorMessageAndCode("opcode_kind_RegisterToRegisterMemory not implemented\n", -1);
         case opcode_kind_Jump:
         {
-            char *JumpInstructionName = JumpInstructionNameTable[FirstByte];
             s8 InstructionOffset = GetImmediate(InstructionBuffer, 1, 0);
             InstructionLength = 2;
-            Result = SimulateJump(InstructionBuffer, Mode, JumpInstructionName, InstructionOffset);
+            Result = SimulateJump(InstructionBuffer, Mode, InstructionOffset);
         } break;
         default:
             printf("FirstByte"); DEBUG_PrintByteInBinary(FirstByte); printf("\n");
