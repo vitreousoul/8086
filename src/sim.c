@@ -108,13 +108,6 @@ opcode OpcodeTable[OPCODE_COUNT] = {
     [0b111000] = {opcode_kind_Jump,instruction_kind_Derived},
 };
 
-s32 ModTable[MOD_COUNT] = {
-    [0b00] = -1, /* DOCS: Memory Mode, no displacement follows except when R/M = 110, then 16-bit displacement follows */
-    [0b01] = -1, /* DOCS: Memory Mode, 8-bit displacement follows */
-    [0b10] = -1, /* DOCS: Memory Mode, 16-bit displacement follows */
-    [0b11] = -1, /* DOCS: Register Mode (no displacement) */
-};
-
 s32 RegTable[REG_COUNT][W_COUNT] = {
     [0b000] = {AL,AX},
     [0b001] = {CL,CX},
