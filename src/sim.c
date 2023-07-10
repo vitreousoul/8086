@@ -282,18 +282,6 @@ static s32 ReadRegister(register_name RegisterName)
     return 0;
 }
 
-static void SetFlag(flag Flag, s32 ShouldSet)
-{
-    GlobalFlags = ShouldSet ? SET_FLAG(GlobalFlags, Flag) : UNSET_FLAG(GlobalFlags, Flag);
-}
-
-static void UpdateFlags(s16 ResultValue)
-{
-    SetFlag(flag_Zero, ResultValue == 0);
-    SetFlag(flag_Sign, (ResultValue & 0x8000) >> 15);
-    SetFlag(flag_Parity, OnesCount(ResultValue & 0xff) % 2 == 0);
-}
-
 static s32 WriteRegister(register_name RegisterName, s16 Value)
 {
     printf("WriteRegister %s %d\n", DisplayRegisterName(RegisterName), Value);
@@ -319,6 +307,18 @@ static s32 WriteRegister(register_name RegisterName, s16 Value)
         return ErrorMessageAndCode("Write to unknown register\n", 1);
     }
     return 0;
+}
+
+static void SetFlag(flag Flag, s32 ShouldSet)
+{
+    GlobalFlags = ShouldSet ? SET_FLAG(GlobalFlags, Flag) : UNSET_FLAG(GlobalFlags, Flag);
+}
+
+static void UpdateFlags(s16 ResultValue)
+{
+    SetFlag(flag_Zero, ResultValue == 0);
+    SetFlag(flag_Sign, (ResultValue & 0x8000) >> 15);
+    SetFlag(flag_Parity, OnesCount(ResultValue & 0xff) % 2 == 0);
 }
 
 static instruction_kind GetInstructionKindForArithmeticImmediateFromRegisterMemory(s16 REG)
