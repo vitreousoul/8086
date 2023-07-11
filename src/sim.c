@@ -316,7 +316,15 @@ static s32 WriteMemory(s16 MemoryIndex, s16 Value, s32 IsWide)
         printf("MemoryIndex %d\n", MemoryIndex);
         return ErrorMessageAndCode("WriteMemory memory index out-of-bounds\n", 1);
     }
-    GlobalMemory[MemoryIndex] = Value;
+    if (IsWide)
+    {
+        GlobalMemory[MemoryIndex] = Value;
+    }
+    else
+    {
+        u8 HighBits = GlobalMemory[MemoryIndex] & 0xff00;
+        GlobalMemory[MemoryIndex] = HighBits | (Value & 0xff);
+    }
     return 0;
 }
 
@@ -500,7 +508,7 @@ static s32 SimulateRegisterAndEffectiveAddress(simulation_mode Mode, opcode Opco
     } break;
     case simulation_mode_Simulate:
     {
-        MemoryIndex = IsDirectAddress ? Immediate : GetMemoryIndexFromEffectiveAddress(EffectiveAddress, 0);
+        MemoryIndex = IsDirectAddress ? Immediate : GetMemoryIndexFromEffectiveAddress(EffectiveAddress, Offset);
         s16 MemoryValue = ReadMemory(MemoryIndex + Offset, IsWide);
         s16 RegisterValue = ReadRegister(DestinationRegister);
         switch(Opcode.InstructionKind)
@@ -616,7 +624,6 @@ static s32 SimulateImmediateToEffectiveAddressWithOffset(simulation_mode Mode, o
     char *ImmediateSizeName = DisplayByteSize(IsWide);
     char *EffectiveAddressDisplay = GetEffectiveAddressDisplay(EffectiveAddress);
     s32 MemoryIndex = -1;
-    if (!IsWide) return ErrorMessageAndCode("SimulateImmediateToEffectiveAddressWithOffset byte sized instructions not implemented!\n", 1);
     switch(Mode)
     {
     case simulation_mode_Print:
@@ -690,30 +697,13 @@ static s32 SimulateImmediateToEffectiveAddress(simulation_mode Mode, opcode Opco
         case eac_DIRECT_ADDRESS:
             if (!IsDirectAddress) return ErrorMessageAndCode("SimulateImmediateToEffectiveAddress reached eac_DIRECT_ADDRESS but IsDirectAddress is false!\n", 1);
             return WriteMemory(DirectAddress, Immediate, IsWide);
-        case eac_BX_SI:
-        case eac_BX_DI:
-        case eac_BP_SI:
-        case eac_BP_DI:
-        case eac_SI:
-        case eac_DI:
-        case eac_BX:
+        case eac_BX_SI: case eac_BX_DI: case eac_BP_SI: case eac_BP_DI:
+        case eac_SI: case eac_DI: case eac_BX:
         // TODO: nocommit we shouldn't need to check the offset paths, since that is done in SimulateImmediateToEffectiveAddressWithOffset
-        case eac_BX_SI_D8:
-        case eac_BX_DI_D8:
-        case eac_BP_SI_D8:
-        case eac_BP_DI_D8:
-        case eac_SI_D8:
-        case eac_DI_D8:
-        case eac_BP_D8:
-        case eac_BX_D8:
-        case eac_BX_SI_D16:
-        case eac_BX_DI_D16:
-        case eac_BP_SI_D16:
-        case eac_BP_DI_D16:
-        case eac_SI_D16:
-        case eac_DI_D16:
-        case eac_BP_D16:
-        case eac_BX_D16:
+        case eac_BX_SI_D8: case eac_BX_DI_D8: case eac_BP_SI_D8: case eac_BP_DI_D8:
+        case eac_SI_D8: case eac_DI_D8: case eac_BP_D8: case eac_BX_D8:
+        case eac_BX_SI_D16: case eac_BX_DI_D16: case eac_BP_SI_D16: case eac_BP_DI_D16:
+        case eac_SI_D16: case eac_DI_D16: case eac_BP_D16: case eac_BX_D16:
         case eac_NONE:
         default:
             printf("EffectiveAddress %d %s\n", EffectiveAddress, GetEffectiveAddressDisplay(EffectiveAddress));
@@ -879,6 +869,7 @@ static s32 SimulateInstructions(simulation_mode Mode)
         opcode_kind FullByteOpcodeKind = FullByteOpcodeTable[FirstByte];
         if (FullByteOpcodeKind)
         {
+            printf("FullByteOpcodeKind\n");
             // NOTE: hack because the simulator started off only parsing 6-bit opcodes.....
             Opcode = (opcode){FullByteOpcodeKind,0};
         }
@@ -965,6 +956,7 @@ static s32 SimulateInstructions(simulation_mode Mode)
                     s16 Displacement = GetImmediate(2, IsWideDisplacement);
                     s16 ImmediateOffset = MOD == 0b10 ? 4 : 3;
                     s16 Immediate = GetImmediate(ImmediateOffset, IsWideData);
+                    printf("Immediate %d       Displacement %d\n", Immediate, Displacement);
                     Result = SimulateImmediateToEffectiveAddressWithOffset(Mode, Opcode, EffectiveAddress, IsWideDisplacement, Immediate, Displacement, IsMove, W);
                 }
                 else
@@ -1027,7 +1019,7 @@ static s32 SimulateInstructions(simulation_mode Mode)
     return Result;
 }
 
-static s32 TestSim(void)
+static s32 TestSim(simulation_command_line_args CommandLineArgs)
 {
     s32 I, SimResult = 0;
     simulation_mode Mode = simulation_mode_Simulate;
@@ -1043,8 +1035,9 @@ static s32 TestSim(void)
         /* "../assets/listing_0048_ip_register", */
         /* "../assets/listing_0049_conditional_jumps", */
         /* "../assets/listing_0051_memory_mov", */
-        "../assets/listing_0052_memory_add_loop",
+        /* "../assets/listing_0052_memory_add_loop", */
         /* "../assets/listing_0053_add_loop_challenge", */
+        "../assets/listing_0054_draw_rectangle",
     };
 
     for (I = 0; I < ARRAY_COUNT(FilePaths); ++I)
@@ -1062,14 +1055,53 @@ static s32 TestSim(void)
         }
 
         printf("; %s\n", FilePaths[I]);
-        SimResult = SimulateInstructions(Mode);
         FreeBuffer(Buffer);
+        SimResult = SimulateInstructions(Mode);
+        if (CommandLineArgs.DumpMemory)
+        {
+            FILE *file = fopen("../dist/memory_dump.data", "wb");
+            fwrite(GlobalMemory, 1, GLOBAL_MEMORY_SIZE, file);
+            fclose(file);
+        }
     }
     return SimResult;
 }
 
-int main(void)
+static s32 StringMatch(char *StringA, char *StringB)
 {
-    int Result = TestSim();
+    s32 I = 0, Result = 1;
+    while (StringA[I] != 0 && StringB[I] != 0)
+    {
+        if (StringA[I] != StringB[I])
+        {
+            Result = 0;
+            break;
+        }
+        ++I;
+    }
+    return Result;
+}
+
+static simulation_command_line_args ParseArgs(int ArgCount, char **Args)
+{
+    s32 I;
+    simulation_command_line_args CommandLineArgs = {0};
+    if (ArgCount > 1)
+    {
+        for (I = 1; I < ArgCount; ++I)
+        {
+            if (StringMatch(Args[I], "-d") || StringMatch(Args[I], "--dump"))
+            {
+                CommandLineArgs.DumpMemory = 1;
+            }
+        }
+    }
+    return CommandLineArgs;
+}
+
+int main(int ArgCount, char **Args)
+{
+    simulation_command_line_args CommandLineArgs = ParseArgs(ArgCount, Args);
+    int Result = TestSim(CommandLineArgs);
     return Result;
 }

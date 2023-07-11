@@ -146,6 +146,11 @@ typedef enum
     simulation_mode_Simulate,
 } simulation_mode;
 
+typedef struct
+{
+    s32 DumpMemory;
+} simulation_command_line_args;
+
 static char *DisplayOpcodeKind(opcode_kind Kind)
 {
     switch(Kind)
