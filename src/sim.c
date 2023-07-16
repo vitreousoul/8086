@@ -303,7 +303,6 @@ static s16 ReadMemory(s16 MemoryIndex, s32 IsWide)
 {
     if (MemoryIndex < 0 || (s32)MemoryIndex >= GLOBAL_MEMORY_SIZE)
     {
-        printf("MemoryIndex %d\n", MemoryIndex);
         return ErrorMessageAndCode("ReadMemory memory index out-of-bounds\n", 1);
     }
     return GlobalMemory[MemoryIndex];
@@ -313,7 +312,6 @@ static s32 WriteMemory(s16 MemoryIndex, s16 Value, s32 IsWide)
 {
     if (MemoryIndex < 0 || (s32)MemoryIndex >= GLOBAL_MEMORY_SIZE)
     {
-        printf("MemoryIndex %d\n", MemoryIndex);
         return ErrorMessageAndCode("WriteMemory memory index out-of-bounds\n", 1);
     }
     if (IsWide)
@@ -408,7 +406,6 @@ static void SetInstructionBufferIndex(s32 Index)
     {
         printf("Invalid insutrction buffer index %d\n", Index);
     }
-    // TODO nocommit: we can just delete this functionand inline the code now that we don't use InstructionBuffer
     // The IP is just the instruction-buffer's index, so we sync the writes here. Maybe at some point it would make more sense to _only_ use the IP register to read the instruction bytes.
     WriteRegister(IP, Index);
 }
@@ -647,7 +644,6 @@ static s32 SimulateImmediateToEffectiveAddressWithOffset(simulation_mode Mode, o
         case eac_SI_D16: case eac_DI_D16: case eac_BP_D16: case eac_BX_D16:
         {
             MemoryIndex = GetMemoryIndexFromEffectiveAddress(EffectiveAddress, Displacement);
-            printf("MemoryIndex %d\n", MemoryIndex);
         } break;
         // TODO: nocommit we shouldn't need to check the NON-offset paths, since that is done in SimulateImmediateToEffectiveAddress
         case eac_BX_SI: case eac_BX_DI:
@@ -869,7 +865,6 @@ static s32 SimulateInstructions(simulation_mode Mode)
         opcode_kind FullByteOpcodeKind = FullByteOpcodeTable[FirstByte];
         if (FullByteOpcodeKind)
         {
-            printf("FullByteOpcodeKind\n");
             // NOTE: hack because the simulator started off only parsing 6-bit opcodes.....
             Opcode = (opcode){FullByteOpcodeKind,0};
         }
@@ -1005,7 +1000,6 @@ static s32 SimulateInstructions(simulation_mode Mode)
         case opcode_kind_Halt:
             // NOTE: set InstructionLength just to make it easier to check with the reference simulator
             InstructionLength = 0;
-            printf("SimulateInstructions HALT\n");
             Running = 0;
             break;
         default:
@@ -1013,7 +1007,6 @@ static s32 SimulateInstructions(simulation_mode Mode)
             return ErrorMessageAndCode("SimulateInstructions default error\n", -1);
         }
         SetInstructionBufferIndex(ReadRegister(IP) + InstructionLength);
-        if (ReadRegister(IP) > 120) Running = 0;
     }
     if (!Result && Mode != simulation_mode_Print) DEBUG_PrintGlobalRegisters();
     return Result;
